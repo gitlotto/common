@@ -32,3 +32,21 @@ func (table Table[R]) TransactInsert(
 
 	return
 }
+
+func (table Table[R]) TransactUpsert(
+	record R,
+) (item *dynamodb.TransactWriteItem, err error) {
+	items, err := dynamodbattribute.MarshalMap(record)
+	if err != nil {
+		return
+	}
+
+	item = &dynamodb.TransactWriteItem{
+		Put: &dynamodb.Put{
+			TableName: aws.String(table.Name),
+			Item:      items,
+		},
+	}
+
+	return
+}
