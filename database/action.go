@@ -107,6 +107,46 @@ func (table TableAction[R]) Query(partitionKey DynamodbKey, cursor *string, limi
 	return
 }
 
+func (table TableAction[R]) QueryAsc(partitionKey DynamodbKey, cursor *string, limit int) (records []R, nextCursor *string, err error) {
+
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(table.Name),
+		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :the_partition_key", partitionKey.Name)),
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":the_partition_key": partitionKey.AttributeValue(),
+		},
+		ScanIndexForward: aws.Bool(true),
+	}
+
+	if cursor != nil {
+		exclusiveStartKey, errOfDecoding := decodeCursor(*cursor)
+		if errOfDecoding != nil {
+			err = errOfDecoding
+			return
+		}
+		queryInput.ExclusiveStartKey = exclusiveStartKey
+	}
+
+	queryInput.Limit = aws.Int64(int64(limit))
+
+	items, err := table.DynamodbClient.Query(queryInput)
+	if err != nil {
+		return
+	}
+
+	records = make([]R, len(items.Items))
+	err = dynamodbattribute.UnmarshalListOfMaps(items.Items, &records)
+	if err != nil {
+		return
+	}
+
+	nextCursor, err = encodeCursor(items.LastEvaluatedKey)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func decodeCursor(cursor string) (exclusiveStartKey map[string]*dynamodb.AttributeValue, err error) {
 	var decodedCursor []byte
 	decodedCursor, err = base64.StdEncoding.DecodeString(cursor)

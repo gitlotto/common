@@ -50,3 +50,24 @@ func (table Table[R]) TransactUpsert(
 
 	return
 }
+
+func (table Table[R]) TransactDelete(
+	record R,
+) (item *dynamodb.TransactWriteItem, err error) {
+	primaryKey := record.ThePrimaryKey()
+	keys := map[string]*dynamodb.AttributeValue{
+		primaryKey.PartitionKey.Name: primaryKey.PartitionKey.AttributeValue(),
+	}
+	if primaryKey.SortKey != nil {
+		keys[primaryKey.SortKey.Name] = primaryKey.SortKey.AttributeValue()
+	}
+
+	item = &dynamodb.TransactWriteItem{
+		Delete: &dynamodb.Delete{
+			TableName: aws.String(table.Name),
+			Key:       keys,
+		},
+	}
+
+	return
+}
