@@ -188,3 +188,49 @@ func Test_Transaction_upsert_should_upsert_a_composite_record_into_the_database_
 	assert.NoError(t, err)
 	assert.Equal(t, compositeRecord2, actualCompositeRecord2)
 }
+
+func Test_Transaction_delete_should_delete_a_simple_record_from_the_database(t *testing.T) {
+	var err error
+
+	simpleRecord1 := simpleRecord{
+		PartitionKey: uuid.New().String(),
+		SomeValue:    "some value 1",
+	}
+
+	err = simpleRecordsTable.Action(dynamodbClient).Persist(simpleRecord1)
+	assert.NoError(t, err)
+
+	err = NewTransaction().
+		Include(simpleRecordsTable.TransactDelete(simpleRecord1)).
+		Execute(dynamodbClient)
+	assert.NoError(t, err)
+
+	actualSimpleRecord1 := simpleRecord{PartitionKey: simpleRecord1.PartitionKey}
+	err = simpleRecordsTable.Action(dynamodbClient).Reconstitute(&actualSimpleRecord1)
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+func Test_Transaction_delete_should_delete_a_composite_record_from_the_database(t *testing.T) {
+	var err error
+
+	compositeRecord1 := compositeRecord{
+		PartitionKey: uuid.New().String(),
+		SortKey:      rand.Int(),
+		SomeValue:    "some value",
+	}
+
+	err = compositeRecordsTable.Action(dynamodbClient).Persist(compositeRecord1)
+	assert.NoError(t, err)
+
+	err = NewTransaction().
+		Include(compositeRecordsTable.TransactDelete(compositeRecord1)).
+		Execute(dynamodbClient)
+	assert.NoError(t, err)
+
+	actualCompositeRecord1 := compositeRecord{
+		PartitionKey: compositeRecord1.PartitionKey,
+		SortKey:      compositeRecord1.SortKey,
+	}
+	err = compositeRecordsTable.Action(dynamodbClient).Reconstitute(&actualCompositeRecord1)
+	assert.ErrorIs(t, err, ErrNotFound)
+}
