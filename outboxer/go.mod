@@ -1,6 +1,6 @@
 module github.com/gitlotto/common/outboxer
 
-go 1.23.6
+go 1.24.6
 
 require (
 	github.com/aws/aws-sdk-go v1.51.30

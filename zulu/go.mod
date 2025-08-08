@@ -1,10 +1,10 @@
 module github.com/gitlotto/common/zulu
 
-go 1.23.6
+go 1.24.6
 
-require github.com/aws/aws-sdk-go v1.50.28
+require github.com/aws/aws-sdk-go v1.51.30
 
-require github.com/stretchr/testify v1.8.1
+require github.com/stretchr/testify v1.9.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

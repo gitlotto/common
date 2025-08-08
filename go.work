@@ -1,15 +1,15 @@
-go 1.23.6
+go 1.24.6
 
 use (
-    ./api
-    ./batcher
-    ./database
-    ./env_var
-    ./logging
-    ./notification
-    ./outboxer
-    ./queue
-    ./workflows
-    ./zulu
-    ./direct_pass
+	./api
+	./batcher
+	./database
+	./direct_pass
+	./env_var
+	./logging
+	./notification
+	./outboxer
+	./queue
+	./workflows
+	./zulu
 )
