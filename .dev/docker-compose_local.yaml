@@ -4,7 +4,6 @@ services:
 
   dynamodb-admin:
     image: aaronshaf/dynamodb-admin:latest
-    container_name: dynamodb_admin
     restart: always
     hostname: dynamodb-admin
     ports:
@@ -17,7 +16,6 @@ services:
 
   sqs-admin:
     image: pacovk/sqs-admin:latest
-    container_name: sqs_admin
     restart: always
     hostname: sqs-admin
     ports:
@@ -30,7 +28,6 @@ services:
 
   localstack:
     hostname: aws
-    container_name: "localstack_main"
     image: localstack/localstack:3.2
     ports:
       - "127.0.0.1:4566:4566"            # LocalStack Gateway

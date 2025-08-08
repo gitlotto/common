@@ -1,8 +1,8 @@
 module github.com/gitlotto/common/notification
 
 require (
-	github.com/aws/aws-sdk-go v1.49.13
-	github.com/google/uuid v1.2.0
+	github.com/aws/aws-sdk-go v1.51.30
+	github.com/google/uuid v1.6.0
 )
 
 require (
@@ -10,4 +10,4 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 )
 
-go 1.23.6
+go 1.24.6
