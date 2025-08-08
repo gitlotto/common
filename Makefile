@@ -1,8 +1,8 @@
 # Makefile for GitLotto Common
 
-.PHONY: all deps test setup-python setup-aws setup-samlocal docker-up docker-down
+.PHONY: deps dev_up ci_up setup dev_down ci_down dev_reset ci_reset test tag-all
 
-MODULES = api batcher database env_var logging notification outboxer queue workflows zulu
+MODULES = api batcher database direct_pass env_var logging notification outboxer queue workflows zulu
 
 # Install Go dependencies for all modules
 deps:
@@ -66,3 +66,19 @@ test:
 	cd workflows && go test ./... -v -count=1 -p 1 && cd ..
 	cd outboxer && go test ./... -v -count=1 -p 1 && cd ..
 	cd zulu && go test ./... -v -count=1 -p 1 && cd ..
+
+# Tag all modules with the same version and push to remote
+# Usage: make tag-all VERSION=v0.17.0
+tag-all:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "❌ Error: VERSION is required. Usage: make tag-all VERSION=v0.17.0"; \
+		exit 1; \
+	fi
+	@echo "🏷️  Tagging all modules with version $(VERSION)..."
+	@for module in $(MODULES); do \
+		echo "  📦 Tagging $$module/$(VERSION)"; \
+		git tag $$module/$(VERSION); \
+	done
+	@echo "🚀 Pushing all tags to remote..."
+	@git push origin --tags
+	@echo "✅ All modules tagged with $(VERSION) and pushed!"
