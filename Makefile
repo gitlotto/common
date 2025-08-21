@@ -25,7 +25,7 @@ ci_up:
 	@echo "✅ Docker containers started in detached mode"
 
 # Setup local AWS infrastructure (requires dev-up to be running)
-dev_setup:
+setup:
 	@echo "🔧 Setting up local AWS infrastructure..."
 	@aws --endpoint-url http://localhost:4566 s3api create-bucket --bucket gitlotto
 	@echo "📦 S3 bucket created"
@@ -58,9 +58,9 @@ ci_down:
 	@echo "✅ Docker containers stopped and removed"
 
 # Full reset: stop everything, start, and setup
-dev_reset: dev_down dev_up dev_setup
+dev_reset: dev_down dev_up setup
 
-ci_reset: ci_down ci_up ci_setup
+ci_reset: ci_down ci_up setup
 
 # Test and deploy for all modules
 test:
