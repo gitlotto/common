@@ -1,16 +1,17 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
 // this is a test util. But it is accessible from production code. Figure out how to create shared test utils in go
-func GetLastNCommands(svc *sqs.SQS, queueUrl string, numberOfMessages int) (lastNMessages []sqs.Message, err error) {
+func GetLastNCommands(ctx context.Context, svc *sqs.Client, queueUrl string, numberOfMessages int) (lastNMessages []types.Message, err error) {
 
-	var lastMessages []sqs.Message
+	var lastMessages []types.Message
 	supposedlyHasMessages := true
 
 	for {
@@ -18,12 +19,13 @@ func GetLastNCommands(svc *sqs.SQS, queueUrl string, numberOfMessages int) (last
 			break
 		}
 		var resp *sqs.ReceiveMessageOutput
-		resp, err = svc.ReceiveMessage(&sqs.ReceiveMessageInput{
+		receiveMessageInput := &sqs.ReceiveMessageInput{
 			QueueUrl:            &queueUrl,
-			MaxNumberOfMessages: aws.Int64(10), // You can adjust this number
-			VisibilityTimeout:   aws.Int64(10), // 30 seconds timeout for processing
-			WaitTimeSeconds:     aws.Int64(0),  // Long polling
-		})
+			MaxNumberOfMessages: int32(10), // You can adjust this number
+			VisibilityTimeout:   int32(10),
+			WaitTimeSeconds:     int32(0),
+		}
+		resp, err = svc.ReceiveMessage(ctx, receiveMessageInput)
 		if err != nil {
 			fmt.Printf("Failed to fetch message with error%v", err)
 			return
@@ -35,17 +37,16 @@ func GetLastNCommands(svc *sqs.SQS, queueUrl string, numberOfMessages int) (last
 		}
 
 		for _, message := range resp.Messages {
-			_, err = svc.DeleteMessage(&sqs.DeleteMessageInput{
+			deleteMessageInput := &sqs.DeleteMessageInput{
 				QueueUrl:      &queueUrl,
 				ReceiptHandle: message.ReceiptHandle,
-			})
+			}
+			_, err = svc.DeleteMessage(ctx, deleteMessageInput)
 			if err != nil {
 				fmt.Printf("Failed to delete message with error%v", err)
 				return
 			}
-			if message != nil {
-				lastMessages = append(lastMessages, *message)
-			}
+			lastMessages = append(lastMessages, message)
 		}
 	}
 

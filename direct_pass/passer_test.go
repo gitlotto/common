@@ -1,66 +1,93 @@
 package direct_pass
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gitlotto/common/database"
 	"github.com/gitlotto/common/logging"
+	"github.com/gitlotto/common/notification"
 	"github.com/gitlotto/common/queue"
 	"github.com/gitlotto/common/workflows"
 	"github.com/gitlotto/common/zulu"
 )
 
-var awsConfig = aws.Config{
-	Region:     aws.String("us-east-1"),
-	Endpoint:   aws.String("http://localhost:4566"), // this is the LocalStack endpoint for all services
-	DisableSSL: aws.Bool(true),
+var dynamodbClient *dynamodb.Client
+var sqsClient *sqs.Client
+var snsClient *sns.Client
+
+func setup() bool {
+	ctx := context.Background()
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
+	if err != nil {
+		panic(err)
+	}
+	dynamodbClient = dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String("http://localhost:4566")
+	})
+	sqsClient = sqs.NewFromConfig(cfg, func(o *sqs.Options) {
+		o.BaseEndpoint = aws.String("http://localhost:4566")
+	})
+	snsClient = sns.NewFromConfig(cfg, func(o *sns.Options) {
+		o.BaseEndpoint = aws.String("http://localhost:4566")
+	})
+	return true
 }
 
-var awsSession = session.Must(session.NewSession(&awsConfig))
+var _ = setup()
+
 var logger = logging.MustCreateZuluTimeLogger()
 
 const sevenHours time.Duration = time.Hour * 7
 
 const workflowsTableName = "direct_passer_dynamodb-workflows"
 
+const notificationTopicArn = "arn:aws:sns:us-east-1:000000000000:direct_passer_notification-Notifications.fifo"
+
 var passer = DirectPasser{
 	workflowsTableName:   workflowsTableName,
-	notificationTopicArn: "arn:aws:sns:us-east-1:000000000000:direct_passer_notification-Notifications.fifo",
+	notificationTopicArn: notificationTopicArn,
 	nextStartIn:          sevenHours,
-	awsSession:           awsSession,
-	logger:               logger,
+	dynamodbClient:       dynamodbClient,
+	sqsClient:            sqsClient,
+	postman: notification.Postman{
+		SnsClient: snsClient,
+		TopicArn:  notificationTopicArn,
+	},
+	logger: logger,
 }
-
-var dynamodbClient = dynamodb.New(awsSession)
-var sqsClient = sqs.New(awsSession)
 
 var notificationQueueUrl = "http://localhost:4566/000000000000/direct_passer_notification-Notifications.fifo"
 
 var queueName = "http://localhost:4566/000000000000/direct_passer_queues.fifo"
 
 var workflowsDynamodbTable = database.Table[workflows.WorkflowRecord]{
-	Name: workflowsTableName,
+	Name:         workflowsTableName,
+	PartitionKey: "event_id",
+	SortKey:      aws.String("target_queue_url"),
 }
 
 func Test_Workflow_Direct_passer_should_write_the_workflow_into_the_sqs(t *testing.T) {
 	var err error
+	ctx := context.TODO()
 
 	startOfTesting := time.Now()
 	startOfTesting = startOfTesting.Add(-time.Second)
 
 	workflowStartAt := time.Now().Add(-time.Hour * 1)
 	workflow := makeFifoWorkflowRecord(queueName, workflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(workflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, workflow)
 	assert.NoError(t, err)
 
 	event := events.DynamoDBEvent{
@@ -84,13 +111,13 @@ func Test_Workflow_Direct_passer_should_write_the_workflow_into_the_sqs(t *testi
 		},
 	}
 
-	err = passer.Pass(event)
+	err = passer.Pass(ctx, event)
 	assert.NoError(t, err)
 
 	stratOfChecking := time.Now()
 	stratOfChecking = stratOfChecking.Add(time.Second)
 
-	lastNCommandsFromQueue, err := queue.GetLastNCommands(sqsClient, queueName, 1)
+	lastNCommandsFromQueue, err := queue.GetLastNCommands(ctx, sqsClient, queueName, 1)
 	assert.NoError(t, err)
 
 	actualEventsFromQueue := make([]string, 1)
@@ -105,7 +132,7 @@ func Test_Workflow_Direct_passer_should_write_the_workflow_into_the_sqs(t *testi
 		EventId:        workflow.EventId,
 		TargetQueueUrl: queueName,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualWorkflow)
 	assert.WithinRange(t, actualWorkflow.StartAt.ToTime(), startOfTesting.Add(sevenHours), stratOfChecking.Add(sevenHours))
@@ -115,10 +142,10 @@ func Test_Workflow_Direct_passer_should_write_the_workflow_into_the_sqs(t *testi
 
 func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_the_event_is_not_a_creation_event(t *testing.T) {
 	var err error
-
+	ctx := context.TODO()
 	workflowStartAt := time.Now().Add(-time.Hour * 1)
 	workflow := makeFifoWorkflowRecord(queueName, workflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(workflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, workflow)
 	assert.NoError(t, err)
 
 	event := events.DynamoDBEvent{
@@ -142,10 +169,10 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 		},
 	}
 
-	err = passer.Pass(event)
+	err = passer.Pass(ctx, event)
 	assert.NoError(t, err)
 
-	lastNCommandsFromQueue, err := queue.GetLastNCommands(sqsClient, queueName, 1)
+	lastNCommandsFromQueue, err := queue.GetLastNCommands(ctx, sqsClient, queueName, 1)
 	assert.NoError(t, err)
 
 	assert.Empty(t, lastNCommandsFromQueue)
@@ -154,17 +181,17 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 		EventId:        workflow.EventId,
 		TargetQueueUrl: queueName,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 	assert.Equal(t, workflow, actualWorkflow)
 }
 
 func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_the_start_date_of_the_event_Has_not_arrived_yet(t *testing.T) {
 	var err error
-
+	ctx := context.TODO()
 	workflowStartAt := time.Now().Add(time.Hour * 1)
 	workflow := makeFifoWorkflowRecord(queueName, workflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(workflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, workflow)
 	assert.NoError(t, err)
 
 	event := events.DynamoDBEvent{
@@ -188,10 +215,10 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 		},
 	}
 
-	err = passer.Pass(event)
+	err = passer.Pass(ctx, event)
 	assert.NoError(t, err)
 
-	lastNCommandsFromQueue, err := queue.GetLastNCommands(sqsClient, queueName, 1)
+	lastNCommandsFromQueue, err := queue.GetLastNCommands(ctx, sqsClient, queueName, 1)
 	assert.NoError(t, err)
 
 	assert.Empty(t, lastNCommandsFromQueue)
@@ -200,19 +227,19 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 		EventId:        workflow.EventId,
 		TargetQueueUrl: queueName,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 	assert.Equal(t, workflow, actualWorkflow)
 }
 
 func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *testing.T) {
 	var err error
-
+	ctx := context.TODO()
 	workflowStartAt := time.Now().Add(-time.Hour * 1)
 	workflow := makeFifoWorkflowRecord(queueName, workflowStartAt)
 	unknownQueue := "http://localhost:4566/000000000000/unknown_queue.fifo"
 	workflow.TargetQueueUrl = unknownQueue
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(workflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, workflow)
 	assert.NoError(t, err)
 
 	eventId := uuid.New().String()
@@ -237,10 +264,10 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 		},
 	}
 
-	err = passer.Pass(event)
+	err = passer.Pass(ctx, event)
 	assert.NoError(t, err)
 
-	lastNCommandsFromQueue, err := queue.GetLastNCommands(sqsClient, queueName, 1)
+	lastNCommandsFromQueue, err := queue.GetLastNCommands(ctx, sqsClient, queueName, 1)
 	assert.NoError(t, err)
 
 	assert.Empty(t, lastNCommandsFromQueue)
@@ -249,11 +276,11 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 		EventId:        workflow.EventId,
 		TargetQueueUrl: unknownQueue,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 	assert.Equal(t, workflow, actualWorkflow)
 
-	lastNCommandsFromNotificationQueue, err := queue.GetLastNCommands(sqsClient, notificationQueueUrl, 1)
+	lastNCommandsFromNotificationQueue, err := queue.GetLastNCommands(ctx, sqsClient, notificationQueueUrl, 1)
 	assert.NoError(t, err)
 
 	expectedNotification := fmt.Sprintf(

@@ -3,8 +3,7 @@ package zulu
 import (
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 type Date struct {
@@ -34,23 +33,27 @@ func (z Date) String() string {
 	return z.ToTime().Format("2006-01-02")
 }
 
-func (e Date) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	av.S = aws.String(e.String())
-	av.N = nil
-	return nil
+// MarshalDynamoDBAttributeValue implements attributevalue.Marshaler for AWS SDK v2
+func (e Date) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	return &types.AttributeValueMemberS{Value: e.String()}, nil
 }
 
-func (e *Date) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	if av.S == nil || *av.S == "" {
+// UnmarshalDynamoDBAttributeValue implements attributevalue.Unmarshaler for AWS SDK v2
+func (e *Date) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	switch v := av.(type) {
+	case *types.AttributeValueMemberS:
+		if v.Value == "" {
+			return nil
+		}
+		t, err := time.Parse("2006-01-02", v.Value)
+		if err != nil {
+			return err
+		}
+		t = t.UTC()
+		e.year = t.Year()
+		e.month = t.Month()
+		e.day = t.Day()
 		return nil
 	}
-	t, err := time.Parse("2006-01-02", *av.S)
-	if err != nil {
-		return err
-	}
-	t = t.UTC()
-	e.year = t.Year()
-	e.month = t.Month()
-	e.day = t.Day()
 	return nil
 }

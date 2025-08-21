@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/gitlotto/common/database"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/gitlotto/common/zulu"
 )
 
@@ -27,19 +26,17 @@ type WorkflowRecord struct {
 	EventMessageGroupId string         `dynamodbav:"event_message_group_id"`
 }
 
-func (record WorkflowRecord) ThePrimaryKey() database.PrimaryKey {
-	return database.PrimaryKey{
-		PartitionKey: database.DynamodbKey{
-			Name:  "event_id",
-			Value: record.EventId,
-			Type:  database.KeyTypeString,
-		},
-		SortKey: &database.DynamodbKey{
-			Name:  "target_queue_url",
-			Value: record.TargetQueueUrl,
-			Type:  database.KeyTypeString,
-		},
+func (record WorkflowRecord) PartitionKey() types.AttributeValue {
+	return &types.AttributeValueMemberS{
+		Value: record.EventId,
 	}
+}
+
+func (record WorkflowRecord) SortKey() *types.AttributeValue {
+	var sk types.AttributeValue = &types.AttributeValueMemberS{
+		Value: record.TargetQueueUrl,
+	}
+	return &sk
 }
 
 func (record WorkflowRecord) EventMessageDeduplicationId() string {
@@ -98,18 +95,4 @@ func NewEventId(tableName string, partitionKey string, sortKey *string) EventId 
 
 func (id EventId) String() string {
 	return id.value
-}
-
-func (id EventId) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	av.S = &id.value
-	return nil
-}
-
-func (id *EventId) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	if av.S == nil || *av.S == "" {
-		return nil
-	}
-
-	id.value = *av.S
-	return nil
 }

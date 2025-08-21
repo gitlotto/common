@@ -1,13 +1,14 @@
 package outboxer
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/gitlotto/common/database"
 	"github.com/gitlotto/common/notification"
 	"github.com/gitlotto/common/workflows"
@@ -21,23 +22,20 @@ type Outboxer struct {
 	notificationTopicArn      string
 	amountOfWorkflowsToOutbox int
 	nextStartIn               time.Duration
-	awsSession                *session.Session
+	dynamodbClient            *dynamodb.Client
+	sqsClient                 *sqs.Client
+	postman                   notification.Postman
 	logger                    *zap.Logger
 }
 
-func (outboxer *Outboxer) Outbox(requestId string) (err error) {
+func (outboxer *Outboxer) Outbox(ctx context.Context, requestId string) (err error) {
 
 	logger := outboxer.logger
 	defer logger.Sync()
-	awsSession := outboxer.awsSession
-
-	dynamodbClient := dynamodb.New(awsSession)
-	sqsClient := sqs.New(awsSession)
-	postman := notification.NewPostman(awsSession, outboxer.notificationTopicArn)
 
 	defer func() {
 		if err != nil {
-			postman.SendNotification(requestId, err.Error())
+			outboxer.postman.SendNotification(ctx, requestId, err.Error())
 		}
 	}()
 
@@ -45,19 +43,23 @@ func (outboxer *Outboxer) Outbox(requestId string) (err error) {
 	logger.Info("outboxing workflows ...")
 
 	workflowsTable := workflows.WorkflowRecordTable{
-		Table:          database.Table[workflows.WorkflowRecord]{Name: outboxer.workflowsTableName},
-		DynamodbClient: dynamodbClient,
+		Table: database.Table[workflows.WorkflowRecord]{
+			Name:         outboxer.workflowsTableName,
+			PartitionKey: "event_id",
+			SortKey:      aws.String("target_queue_url"),
+		},
+		DynamodbClient: outboxer.dynamodbClient,
 	}
 
 	openWorkflowIndex := workflows.OpenWorkflowsIndex{
 		TableName:      outboxer.workflowsTableName,
 		IndexName:      outboxer.openWorkflowsIndexName,
-		DynamodbClient: dynamodbClient,
+		DynamodbClient: outboxer.dynamodbClient,
 	}
 
 	now := time.Now()
 
-	workflowRecords, err := openWorkflowIndex.OpenWorkflows(outboxer.amountOfWorkflowsToOutbox, zulu.DateTimeFromTime(now))
+	workflowRecords, err := openWorkflowIndex.OpenWorkflows(ctx, outboxer.amountOfWorkflowsToOutbox, zulu.DateTimeFromTime(now))
 
 	logger = logger.With(zap.Int("amountOfWorkflows", len(workflowRecords)))
 	logger.Info("fetched open workflows")
@@ -70,7 +72,7 @@ func (outboxer *Outboxer) Outbox(requestId string) (err error) {
 
 	defer func() {
 		if len(errorsFromEventSending) > 0 {
-			postman.SendNotification(requestId, fmt.Sprintf("impossible to send %d events", len(errorsFromEventSending)))
+			outboxer.postman.SendNotification(ctx, requestId, fmt.Sprintf("impossible to send %d events", len(errorsFromEventSending)))
 		}
 	}()
 
@@ -78,12 +80,12 @@ func (outboxer *Outboxer) Outbox(requestId string) (err error) {
 		logger = logger.With(zap.String("eventId", workflowRecord.EventId))
 		logger = logger.With(zap.String("targetQueueUrl", workflowRecord.TargetQueueUrl))
 		logger.Info("sending event ...")
-		_, errFromEventSending := sqsClient.SendMessage(&sqs.SendMessageInput{
+		sendMessageInput := &sqs.SendMessageInput{
 			MessageBody:            aws.String(workflowRecord.Event),
 			QueueUrl:               aws.String(workflowRecord.TargetQueueUrl),
 			MessageGroupId:         aws.String(workflowRecord.EventMessageGroupId),
 			MessageDeduplicationId: aws.String(workflowRecord.EventMessageDeduplicationId()),
-			MessageAttributes: map[string]*sqs.MessageAttributeValue{
+			MessageAttributes: map[string]types.MessageAttributeValue{
 				"EventId": {
 					DataType:    aws.String("String"),
 					StringValue: aws.String(workflowRecord.EventId),
@@ -93,7 +95,8 @@ func (outboxer *Outboxer) Outbox(requestId string) (err error) {
 					StringValue: aws.String(workflowRecord.TargetQueueUrl),
 				},
 			},
-		})
+		}
+		_, errFromEventSending := outboxer.sqsClient.SendMessage(ctx, sendMessageInput)
 
 		if errFromEventSending != nil {
 			logger.Error("impossible to send event", zap.Error(errFromEventSending))
@@ -103,7 +106,7 @@ func (outboxer *Outboxer) Outbox(requestId string) (err error) {
 		logger.Info("event sent. Postponing workflow ...")
 		now := time.Now()
 		nextStartAt := now.Add(outboxer.nextStartIn)
-		err = workflowsTable.Postpone(workflowRecord, zulu.DateTimeFromTime(nextStartAt))
+		err = workflowsTable.Postpone(ctx, workflowRecord, zulu.DateTimeFromTime(nextStartAt))
 
 		if err != nil {
 			logger.Error("impossible to postpone workflow", zap.Error(err))

@@ -3,27 +3,26 @@ package database
 import (
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 func (table Table[R]) TransactInsert(
 	record R,
-) (item *dynamodb.TransactWriteItem, err error) {
-	items, err := dynamodbattribute.MarshalMap(record)
+) (item types.TransactWriteItem, err error) {
+	items, err := attributevalue.MarshalMap(record)
 	if err != nil {
 		return
 	}
 
-	primaryKey := record.ThePrimaryKey()
-	condition := fmt.Sprintf("attribute_not_exists(%s)", primaryKey.PartitionKey.Name)
-	if primaryKey.SortKey != nil {
-		condition = fmt.Sprintf("%s AND attribute_not_exists(%s)", condition, primaryKey.SortKey.Name)
+	condition := fmt.Sprintf("attribute_not_exists(%s)", table.PartitionKey)
+	if table.SortKey != nil {
+		condition = fmt.Sprintf("%s AND attribute_not_exists(%s)", condition, *table.SortKey)
 	}
 
-	item = &dynamodb.TransactWriteItem{
-		Put: &dynamodb.Put{
+	item = types.TransactWriteItem{
+		Put: &types.Put{
 			TableName:           aws.String(table.Name),
 			Item:                items,
 			ConditionExpression: aws.String(condition),
@@ -35,14 +34,14 @@ func (table Table[R]) TransactInsert(
 
 func (table Table[R]) TransactUpsert(
 	record R,
-) (item *dynamodb.TransactWriteItem, err error) {
-	items, err := dynamodbattribute.MarshalMap(record)
+) (item types.TransactWriteItem, err error) {
+	items, err := attributevalue.MarshalMap(record)
 	if err != nil {
 		return
 	}
 
-	item = &dynamodb.TransactWriteItem{
-		Put: &dynamodb.Put{
+	item = types.TransactWriteItem{
+		Put: &types.Put{
 			TableName: aws.String(table.Name),
 			Item:      items,
 		},
@@ -53,17 +52,14 @@ func (table Table[R]) TransactUpsert(
 
 func (table Table[R]) TransactDelete(
 	record R,
-) (item *dynamodb.TransactWriteItem, err error) {
-	primaryKey := record.ThePrimaryKey()
-	keys := map[string]*dynamodb.AttributeValue{
-		primaryKey.PartitionKey.Name: primaryKey.PartitionKey.AttributeValue(),
-	}
-	if primaryKey.SortKey != nil {
-		keys[primaryKey.SortKey.Name] = primaryKey.SortKey.AttributeValue()
+) (item types.TransactWriteItem, err error) {
+	keys, err := table.PrimaryKey(record)
+	if err != nil {
+		return
 	}
 
-	item = &dynamodb.TransactWriteItem{
-		Delete: &dynamodb.Delete{
+	item = types.TransactWriteItem{
+		Delete: &types.Delete{
 			TableName: aws.String(table.Name),
 			Key:       keys,
 		},

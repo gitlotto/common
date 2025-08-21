@@ -1,41 +1,44 @@
 package workflows
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/gitlotto/common/zulu"
 )
 
 type OpenWorkflowsIndex struct {
 	TableName      string
 	IndexName      string
-	DynamodbClient *dynamodb.DynamoDB
+	DynamodbClient *dynamodb.Client
 }
 
-func (index OpenWorkflowsIndex) OpenWorkflows(limit int, until zulu.DateTime) (workflowRecords []WorkflowRecord, err error) {
+func (index OpenWorkflowsIndex) OpenWorkflows(ctx context.Context, limit int, until zulu.DateTime) (workflowRecords []WorkflowRecord, err error) {
 	queryInput := &dynamodb.QueryInput{
 		TableName:              &index.TableName,
 		IndexName:              &index.IndexName,
 		KeyConditionExpression: aws.String("is_open = :is_open AND start_at <= :start_at"),
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":is_open": {
-				S: aws.String(string(Open)),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":is_open": &types.AttributeValueMemberS{
+				Value: string(Open),
 			},
-			":start_at": {
-				S: aws.String(until.String()),
+			":start_at": &types.AttributeValueMemberS{
+				Value: until.String(),
 			},
 		},
 		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int64(int64(limit)),
+		Limit:            aws.Int32(int32(limit)),
 	}
 
-	items, err := index.DynamodbClient.Query(queryInput)
+	items, err := index.DynamodbClient.Query(ctx, queryInput)
 	if err != nil {
 		return
 	}
 
-	err = dynamodbattribute.UnmarshalListOfMaps(items.Items, &workflowRecords)
+	err = attributevalue.UnmarshalListOfMaps(items.Items, &workflowRecords)
 
 	return
 }
