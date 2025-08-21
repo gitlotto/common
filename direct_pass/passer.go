@@ -1,14 +1,15 @@
 package direct_pass
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/gitlotto/common/database"
 	"github.com/gitlotto/common/notification"
 	"github.com/gitlotto/common/workflows"
@@ -21,25 +22,21 @@ type DirectPasser struct {
 	workflowsTableName   string
 	notificationTopicArn string
 	nextStartIn          time.Duration
-	awsSession           *session.Session
+	dynamodbClient       *dynamodb.Client
+	sqsClient            *sqs.Client
+	postman              notification.Postman
 	logger               *zap.Logger
 }
 
-func (passer *DirectPasser) Pass(event events.DynamoDBEvent) (err error) {
+func (passer *DirectPasser) Pass(ctx context.Context, event events.DynamoDBEvent) (err error) {
 
 	logger := passer.logger
 	defer logger.Sync()
-	awsSession := passer.awsSession
-
-	dynamodbClient := dynamodb.New(awsSession)
-	sqsClient := sqs.New(awsSession)
-	postman := notification.NewPostman(awsSession, passer.notificationTopicArn)
-
 	requestId := uuid.New().String()
 
 	defer func() {
 		if err != nil {
-			postman.SendNotification(requestId, err.Error())
+			passer.postman.SendNotification(ctx, requestId, err.Error())
 		}
 	}()
 
@@ -47,15 +44,19 @@ func (passer *DirectPasser) Pass(event events.DynamoDBEvent) (err error) {
 	logger.Info("outboxing workflows ...")
 
 	workflowsTable := workflows.WorkflowRecordTable{
-		Table:          database.Table[workflows.WorkflowRecord]{Name: passer.workflowsTableName},
-		DynamodbClient: dynamodbClient,
+		Table: database.Table[workflows.WorkflowRecord]{
+			Name:         passer.workflowsTableName,
+			PartitionKey: "event_id",
+			SortKey:      aws.String("target_queue_url"),
+		},
+		DynamodbClient: passer.dynamodbClient,
 	}
 
 	processSingle := func(record events.DynamoDBEventRecord, logger *zap.Logger) {
 		var err error
 		defer func() {
 			if err != nil {
-				postman.SendNotification(record.EventID, fmt.Sprintf("impossible to directly pass the event %s to SQS", record.EventID))
+				passer.postman.SendNotification(ctx, record.EventID, fmt.Sprintf("impossible to directly pass the event %s to SQS", record.EventID))
 			}
 		}()
 
@@ -83,12 +84,12 @@ func (passer *DirectPasser) Pass(event events.DynamoDBEvent) (err error) {
 		logger = logger.With(zap.String("eventId", workflowRecord.EventId))
 		logger = logger.With(zap.String("targetQueueUrl", workflowRecord.TargetQueueUrl))
 		logger.Info("sending event ...")
-		_, err = sqsClient.SendMessage(&sqs.SendMessageInput{
+		inputMessage := &sqs.SendMessageInput{
 			MessageBody:            aws.String(workflowRecord.Event),
 			QueueUrl:               aws.String(workflowRecord.TargetQueueUrl),
 			MessageGroupId:         aws.String(workflowRecord.EventMessageGroupId),
 			MessageDeduplicationId: aws.String(workflowRecord.EventMessageDeduplicationId()),
-			MessageAttributes: map[string]*sqs.MessageAttributeValue{
+			MessageAttributes: map[string]types.MessageAttributeValue{
 				"EventId": {
 					DataType:    aws.String("String"),
 					StringValue: aws.String(workflowRecord.EventId),
@@ -98,7 +99,8 @@ func (passer *DirectPasser) Pass(event events.DynamoDBEvent) (err error) {
 					StringValue: aws.String(workflowRecord.TargetQueueUrl),
 				},
 			},
-		})
+		}
+		_, err = passer.sqsClient.SendMessage(ctx, inputMessage)
 
 		if err != nil {
 			logger.Error("impossible to send event", zap.Error(err))
@@ -107,7 +109,7 @@ func (passer *DirectPasser) Pass(event events.DynamoDBEvent) (err error) {
 
 		logger.Info("event sent. Postponing workflow ...")
 		nextStartAt := now.Add(passer.nextStartIn)
-		err = workflowsTable.Postpone(workflowRecord, zulu.DateTimeFromTime(nextStartAt))
+		err = workflowsTable.Postpone(ctx, workflowRecord, zulu.DateTimeFromTime(nextStartAt))
 
 		if err != nil {
 			logger.Error("impossible to postpone workflow", zap.Error(err))

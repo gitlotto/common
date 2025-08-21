@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -14,6 +15,8 @@ import (
 func Test_WorkflowRecordTable_should_postpone_the_workflow_if_it_is_still_open(t *testing.T) {
 	var err error
 
+	ctx := context.TODO()
+
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
 	sortKey := uuid.New().String()
@@ -28,12 +31,12 @@ func Test_WorkflowRecordTable_should_postpone_the_workflow_if_it_is_still_open(t
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
-	err = workflowRecordTable.Action(dynamodbClient).Persist(*workflow)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, *workflow)
 	assert.NoError(t, err)
 
 	nextStartAt := zulu.DateTimeFromTime(time.Date(2023, time.October, 17, 12, 45, 14, 0, time.UTC))
 
-	err = workflowRecordTable.Postpone(*workflow, nextStartAt)
+	err = workflowRecordTable.Postpone(ctx, *workflow, nextStartAt)
 	assert.NoError(t, err)
 
 	actualWorkflow := WorkflowRecord{
@@ -41,7 +44,7 @@ func Test_WorkflowRecordTable_should_postpone_the_workflow_if_it_is_still_open(t
 		TargetQueueUrl: workflow.TargetQueueUrl,
 	}
 
-	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 
 	expectedWorkflow := *workflow
@@ -53,6 +56,8 @@ func Test_WorkflowRecordTable_should_postpone_the_workflow_if_it_is_still_open(t
 
 func Test_WorkflowRecordTable_should_not_postpone_the_workflow_if_it_had_been_closed(t *testing.T) {
 	var err error
+
+	ctx := context.TODO()
 
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
@@ -70,12 +75,12 @@ func Test_WorkflowRecordTable_should_not_postpone_the_workflow_if_it_had_been_cl
 
 	workflow.IsOpen = nil
 
-	err = workflowRecordTable.Action(dynamodbClient).Persist(*workflow)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, *workflow)
 	assert.NoError(t, err)
 
 	nextStartAt := zulu.DateTimeFromTime(time.Date(2023, time.October, 17, 12, 45, 14, 0, time.UTC))
 
-	err = workflowRecordTable.Postpone(*workflow, nextStartAt)
+	err = workflowRecordTable.Postpone(ctx, *workflow, nextStartAt)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, ErrWorkflowHadBeenFinished)
 
@@ -83,7 +88,7 @@ func Test_WorkflowRecordTable_should_not_postpone_the_workflow_if_it_had_been_cl
 		EventId:        workflow.EventId,
 		TargetQueueUrl: workflow.TargetQueueUrl,
 	}
-	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 
 	expectedWorkflow := *workflow
@@ -92,6 +97,8 @@ func Test_WorkflowRecordTable_should_not_postpone_the_workflow_if_it_had_been_cl
 
 func Test_WorkflowRecordTable_should_close_the_workflow_if_it_is_still_open(t *testing.T) {
 	var err error
+
+	ctx := context.TODO()
 
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
@@ -107,19 +114,19 @@ func Test_WorkflowRecordTable_should_close_the_workflow_if_it_is_still_open(t *t
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
-	err = workflowRecordTable.Action(dynamodbClient).Persist(*workflow)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, *workflow)
 	assert.NoError(t, err)
 
 	finishedAt := zulu.DateTimeFromTime(time.Date(2023, time.October, 17, 12, 45, 14, 0, time.UTC))
 
-	err = workflowRecordTable.Close(workflow.EventId, workflow.TargetQueueUrl, finishedAt)
+	err = workflowRecordTable.Close(ctx, workflow.EventId, workflow.TargetQueueUrl, finishedAt)
 	assert.NoError(t, err)
 
 	actualWorkflow := WorkflowRecord{
 		EventId:        workflow.EventId,
 		TargetQueueUrl: workflow.TargetQueueUrl,
 	}
-	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualWorkflow)
 
@@ -133,6 +140,8 @@ func Test_WorkflowRecordTable_should_close_the_workflow_if_it_is_still_open(t *t
 func Test_WorkflowRecordTable_should_not_close_the_workflow_if_it_had_been_closed(t *testing.T) {
 	var err error
 
+	ctx := context.TODO()
+
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
 	sortKey := uuid.New().String()
@@ -149,12 +158,12 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_if_it_had_been_close
 
 	workflow.IsOpen = nil
 
-	err = workflowRecordTable.Action(dynamodbClient).Persist(*workflow)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, *workflow)
 	assert.NoError(t, err)
 
 	finishedAt := zulu.DateTimeFromTime(time.Date(2023, time.October, 17, 12, 45, 14, 0, time.UTC))
 
-	err = workflowRecordTable.Close(workflow.EventId, workflow.TargetQueueUrl, finishedAt)
+	err = workflowRecordTable.Close(ctx, workflow.EventId, workflow.TargetQueueUrl, finishedAt)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, ErrWorkflowHadBeenFinished)
 
@@ -162,7 +171,7 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_if_it_had_been_close
 		EventId:        workflow.EventId,
 		TargetQueueUrl: workflow.TargetQueueUrl,
 	}
-	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 
 	expectedWorkflow := *workflow
@@ -171,6 +180,8 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_if_it_had_been_close
 
 func Test_WorkflowRecordTable_should_close_the_workflow_in_a_transaction_if_it_is_still_open(t *testing.T) {
 	var err error
+
+	ctx := context.TODO()
 
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
@@ -186,7 +197,7 @@ func Test_WorkflowRecordTable_should_close_the_workflow_in_a_transaction_if_it_i
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
-	err = workflowRecordTable.Action(dynamodbClient).Persist(*workflow)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, *workflow)
 	assert.NoError(t, err)
 
 	finishedAt := zulu.DateTimeFromTime(time.Date(2023, time.October, 17, 12, 45, 14, 0, time.UTC))
@@ -194,7 +205,7 @@ func Test_WorkflowRecordTable_should_close_the_workflow_in_a_transaction_if_it_i
 	err = database.
 		NewTransaction().
 		Include(workflowRecordTable.TransactionalClose(workflow.EventId, workflow.TargetQueueUrl, finishedAt)).
-		Execute(dynamodbClient)
+		Execute(ctx, dynamodbClient)
 
 	assert.NoError(t, err)
 
@@ -202,7 +213,7 @@ func Test_WorkflowRecordTable_should_close_the_workflow_in_a_transaction_if_it_i
 		EventId:        workflow.EventId,
 		TargetQueueUrl: workflow.TargetQueueUrl,
 	}
-	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualWorkflow)
 
@@ -216,6 +227,8 @@ func Test_WorkflowRecordTable_should_close_the_workflow_in_a_transaction_if_it_i
 func Test_WorkflowRecordTable_should_not_close_the_workflow_in_a_transaction_if_it_had_been_closed(t *testing.T) {
 	var err error
 
+	ctx := context.TODO()
+
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
 	sortKey := uuid.New().String()
@@ -232,7 +245,7 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_in_a_transaction_if_
 
 	workflow.IsOpen = nil
 
-	err = workflowRecordTable.Action(dynamodbClient).Persist(*workflow)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, *workflow)
 	assert.NoError(t, err)
 
 	finishedAt := zulu.DateTimeFromTime(time.Date(2023, time.October, 17, 12, 45, 14, 0, time.UTC))
@@ -240,7 +253,7 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_in_a_transaction_if_
 	err = database.
 		NewTransaction().
 		Include(workflowRecordTable.TransactionalClose(workflow.EventId, workflow.TargetQueueUrl, finishedAt)).
-		Execute(dynamodbClient)
+		Execute(ctx, dynamodbClient)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, database.ErrConditionalCheckFailed)
 
@@ -248,7 +261,7 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_in_a_transaction_if_
 		EventId:        workflow.EventId,
 		TargetQueueUrl: workflow.TargetQueueUrl,
 	}
-	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 
 	expectedWorkflow := *workflow
@@ -258,6 +271,8 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_in_a_transaction_if_
 func Test_WorkflowRecordTable_should_create_a_workflow_in_a_transaction_if_it_has_not_been_created(t *testing.T) {
 	var err error
 
+	ctx := context.TODO()
+
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
 	sortKey := uuid.New().String()
@@ -275,7 +290,7 @@ func Test_WorkflowRecordTable_should_create_a_workflow_in_a_transaction_if_it_ha
 	err = database.
 		NewTransaction().
 		Include(workflowRecordTable.TransactInsert(*workflow)).
-		Execute(dynamodbClient)
+		Execute(ctx, dynamodbClient)
 
 	assert.NoError(t, err)
 
@@ -283,7 +298,7 @@ func Test_WorkflowRecordTable_should_create_a_workflow_in_a_transaction_if_it_ha
 		EventId:        workflow.EventId,
 		TargetQueueUrl: workflow.TargetQueueUrl,
 	}
-	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(&actualWorkflow)
+	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
 	assert.NoError(t, err)
 
 	expectedWorkflow := *workflow
@@ -293,6 +308,8 @@ func Test_WorkflowRecordTable_should_create_a_workflow_in_a_transaction_if_it_ha
 func Test_WorkflowRecordTable_should_not_create_a_workflow_if_it_has_not_been_created(t *testing.T) {
 	var err error
 
+	ctx := context.TODO()
+
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
 	sortKey := uuid.New().String()
@@ -307,13 +324,13 @@ func Test_WorkflowRecordTable_should_not_create_a_workflow_if_it_has_not_been_cr
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
-	err = workflowRecordTable.Action(dynamodbClient).Persist(*workflow)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, *workflow)
 	assert.NoError(t, err)
 
 	err = database.
 		NewTransaction().
 		Include(workflowRecordTable.TransactInsert(*workflow)).
-		Execute(dynamodbClient)
+		Execute(ctx, dynamodbClient)
 
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, database.ErrConditionalCheckFailed)

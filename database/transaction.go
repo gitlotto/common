@@ -1,9 +1,12 @@
 package database
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 var ErrConditionalCheckFailed = fmt.Errorf("ConditionalCheckFailed")
@@ -13,7 +16,7 @@ type Transaction struct {
 }
 
 type transactionResult struct {
-	transactionWriteItem *dynamodb.TransactWriteItem
+	transactionWriteItem types.TransactWriteItem
 	err                  error
 }
 
@@ -23,7 +26,7 @@ func NewTransaction() *Transaction {
 	}
 }
 
-func (transaction *Transaction) Include(writeItem *dynamodb.TransactWriteItem, err error) (tr *Transaction) {
+func (transaction *Transaction) Include(writeItem types.TransactWriteItem, err error) (tr *Transaction) {
 	result := &transactionResult{
 		transactionWriteItem: writeItem,
 		err:                  err,
@@ -32,8 +35,8 @@ func (transaction *Transaction) Include(writeItem *dynamodb.TransactWriteItem, e
 	return transaction
 }
 
-func (transaction *Transaction) Execute(dynamodbClient *dynamodb.DynamoDB) (err error) {
-	transactionWriteItems := []*dynamodb.TransactWriteItem{}
+func (transaction *Transaction) Execute(ctx context.Context, dynamodbClient *dynamodb.Client) (err error) {
+	transactionWriteItems := []types.TransactWriteItem{}
 	for _, result := range transaction.transactionResults {
 		if result.err != nil {
 			err = result.err
@@ -41,25 +44,27 @@ func (transaction *Transaction) Execute(dynamodbClient *dynamodb.DynamoDB) (err 
 		}
 		transactionWriteItems = append(transactionWriteItems, result.transactionWriteItem)
 	}
-	_, err = dynamodbClient.TransactWriteItems(
-		&dynamodb.TransactWriteItemsInput{
-			TransactItems: transactionWriteItems,
-		},
-	)
 
-	switch errRefined := err.(type) {
-	case *dynamodb.ConditionalCheckFailedException:
+	transactionWriteItemsInput := &dynamodb.TransactWriteItemsInput{
+		TransactItems: transactionWriteItems,
+	}
+	_, err = dynamodbClient.TransactWriteItems(ctx, transactionWriteItemsInput)
+
+	var conditionalCheckFailedException *types.ConditionalCheckFailedException
+	if errors.As(err, &conditionalCheckFailedException) {
 		err = ErrConditionalCheckFailed
 		return
-	case *dynamodb.TransactionCanceledException:
-		for _, reason := range errRefined.CancellationReasons {
+	}
+
+	var transactionCanceledException *types.TransactionCanceledException
+	if errors.As(err, &transactionCanceledException) {
+		for _, reason := range transactionCanceledException.CancellationReasons {
 			if reason.Code != nil && *reason.Code == "ConditionalCheckFailed" {
 				err = ErrConditionalCheckFailed
 				return
 			}
 		}
-	case error:
-		return
 	}
+
 	return
 }

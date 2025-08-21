@@ -1,49 +1,73 @@
 package outboxer
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gitlotto/common/database"
 	"github.com/gitlotto/common/logging"
+	"github.com/gitlotto/common/notification"
 	"github.com/gitlotto/common/queue"
 	"github.com/gitlotto/common/workflows"
 	"github.com/gitlotto/common/zulu"
 )
 
-var awsConfig = aws.Config{
-	Region:     aws.String("us-east-1"),
-	Endpoint:   aws.String("http://localhost:4566"), // this is the LocalStack endpoint for all services
-	DisableSSL: aws.Bool(true),
+var dynamodbClient *dynamodb.Client
+var sqsClient *sqs.Client
+var snsClient *sns.Client
+
+func setup() bool {
+	ctx := context.Background()
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
+	if err != nil {
+		panic(err)
+	}
+	dynamodbClient = dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String("http://localhost:4566")
+	})
+	sqsClient = sqs.NewFromConfig(cfg, func(o *sqs.Options) {
+		o.BaseEndpoint = aws.String("http://localhost:4566")
+	})
+	snsClient = sns.NewFromConfig(cfg, func(o *sns.Options) {
+		o.BaseEndpoint = aws.String("http://localhost:4566")
+	})
+	return true
 }
 
-var awsSession = session.Must(session.NewSession(&awsConfig))
+var _ = setup()
+
 var logger = logging.MustCreateZuluTimeLogger()
 
 const sevenHours time.Duration = time.Hour * 7
 
 const workflowsTableName = "outboxer_dynamodb-workflows"
+const notificationTopicArn = "arn:aws:sns:us-east-1:000000000000:outboxer_notification-Notifications.fifo"
 
 var outboxer = Outboxer{
 	workflowsTableName:        workflowsTableName,
 	openWorkflowsIndexName:    "outboxer_dynamodb-openWorkflows",
-	notificationTopicArn:      "arn:aws:sns:us-east-1:000000000000:outboxer_notification-Notifications.fifo",
+	notificationTopicArn:      notificationTopicArn,
 	amountOfWorkflowsToOutbox: 3,
 	nextStartIn:               sevenHours,
-	awsSession:                awsSession,
-	logger:                    logger,
+	dynamodbClient:            dynamodbClient,
+	sqsClient:                 sqsClient,
+	postman: notification.Postman{
+		SnsClient: snsClient,
+		TopicArn:  notificationTopicArn,
+	},
+	logger: logger,
 }
-
-var dynamodbClient = dynamodb.New(awsSession)
-var sqsClient = sqs.New(awsSession)
 
 var notificationQueueUrl = "http://localhost:4566/000000000000/outboxer_notification-Notifications.fifo"
 
@@ -51,50 +75,54 @@ var queueOne = "http://localhost:4566/000000000000/outboxer_random_queues-one.fi
 var queueTwo = "http://localhost:4566/000000000000/outboxer_random_queues-two.fifo"
 
 var workflowsDynamodbTable = database.Table[workflows.WorkflowRecord]{
-	Name: workflowsTableName,
+	Name:         workflowsTableName,
+	PartitionKey: "event_id",
+	SortKey:      aws.String("target_queue_url"),
 }
 
 func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_events(t *testing.T) {
 	var err error
 
+	ctx := context.Background()
+
 	startOfTesting := time.Now()
 
-	err = deleteAllWorkflows()
+	err = deleteAllWorkflows(ctx)
 	assert.NoError(t, err)
 
 	oldClosedWorkflowStartAt := startOfTesting.Add(-time.Hour * 5)
 	oldClosedWorkflow := makeSimpleWorkflowRecord(queueOne, oldClosedWorkflowStartAt)
 	oldClosedWorkflow.IsOpen = nil
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(oldClosedWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, oldClosedWorkflow)
 	assert.NoError(t, err)
 
 	firstOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 4)
 	firstOpenWorkflow := makeSimpleWorkflowRecord(queueOne, firstOpenWorkflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(firstOpenWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, firstOpenWorkflow)
 	assert.NoError(t, err)
 
 	secondOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 3)
 	secondOpenWorkflow := makeFifoWorkflowRecord(queueTwo, secondOpenWorkflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(secondOpenWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, secondOpenWorkflow)
 	assert.NoError(t, err)
 
 	thirdOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 2)
 	thirdOpenWorkflow := makeSimpleWorkflowRecord(queueOne, thirdOpenWorkflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(thirdOpenWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, thirdOpenWorkflow)
 	assert.NoError(t, err)
 
 	fourthOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 1)
 	fourthOpenWorkflow := makeFifoWorkflowRecord(queueTwo, fourthOpenWorkflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(fourthOpenWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, fourthOpenWorkflow)
 	assert.NoError(t, err)
 
 	requestId := uuid.New().String()
-	err = outboxer.Outbox(requestId)
+	err = outboxer.Outbox(ctx, requestId)
 	assert.NoError(t, err)
 
 	stratOfChecking := time.Now()
 
-	lastNCommandsFromQueueOne, err := queue.GetLastNCommands(sqsClient, queueOne, 2)
+	lastNCommandsFromQueueOne, err := queue.GetLastNCommands(ctx, sqsClient, queueOne, 2)
 	assert.NoError(t, err)
 
 	actualEventsFromQueueOne := make([]string, 2)
@@ -108,7 +136,7 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 
 	assert.ElementsMatch(t, expectedEventsFromQueueOne, actualEventsFromQueueOne)
 
-	lastNCommandsFromQueueTwo, err := queue.GetLastNCommands(sqsClient, queueTwo, 1)
+	lastNCommandsFromQueueTwo, err := queue.GetLastNCommands(ctx, sqsClient, queueTwo, 1)
 	assert.NoError(t, err)
 
 	actualEventsFromQueueTwo := make([]string, 1)
@@ -125,7 +153,7 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 		EventId:        firstOpenWorkflow.EventId,
 		TargetQueueUrl: queueOne,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualFirstWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualFirstWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualFirstWorkflow)
 	assert.WithinRange(t, actualFirstWorkflow.StartAt.ToTime(), startOfTesting.Add(sevenHours-time.Second), stratOfChecking.Add(sevenHours+time.Second))
@@ -136,7 +164,7 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 		EventId:        secondOpenWorkflow.EventId,
 		TargetQueueUrl: queueTwo,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualSecondWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualSecondWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualSecondWorkflow)
 	assert.WithinRange(t, actualSecondWorkflow.StartAt.ToTime(), startOfTesting.Add(sevenHours-time.Second), stratOfChecking.Add(sevenHours+time.Second))
@@ -147,7 +175,7 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 		EventId:        thirdOpenWorkflow.EventId,
 		TargetQueueUrl: queueOne,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualThirdWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualThirdWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualThirdWorkflow)
 	assert.WithinRange(t, actualThirdWorkflow.StartAt.ToTime(), startOfTesting.Add(sevenHours-time.Second), stratOfChecking.Add(sevenHours+time.Second))
@@ -158,7 +186,7 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 		EventId:        fourthOpenWorkflow.EventId,
 		TargetQueueUrl: queueTwo,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualFourthWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualFourthWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualFourthWorkflow)
 	assert.Equal(t, fourthOpenWorkflow, actualFourthWorkflow)
@@ -167,7 +195,7 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 		EventId:        oldClosedWorkflow.EventId,
 		TargetQueueUrl: queueOne,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualOldClosedWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualOldClosedWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualOldClosedWorkflow)
 	assert.Equal(t, oldClosedWorkflow, actualOldClosedWorkflow)
@@ -177,29 +205,31 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *testing.T) {
 	var err error
 
+	ctx := context.Background()
+
 	startOfTesting := time.Now()
 
-	err = deleteAllWorkflows()
+	err = deleteAllWorkflows(ctx)
 	assert.NoError(t, err)
 
 	firstOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 4)
 	firstOpenWorkflow := makeSimpleWorkflowRecord(queueOne, firstOpenWorkflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(firstOpenWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, firstOpenWorkflow)
 	assert.NoError(t, err)
 
 	secondOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 3)
 	unknownQueue := "http://localhost:4566/000000000000/unknown_queue.fifo"
 	secondOpenWorkflow := makeFifoWorkflowRecord(unknownQueue, secondOpenWorkflowStartAt)
-	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(secondOpenWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, secondOpenWorkflow)
 	assert.NoError(t, err)
 
 	requestId := uuid.New().String()
-	err = outboxer.Outbox(requestId)
+	err = outboxer.Outbox(ctx, requestId)
 	assert.NoError(t, err)
 
 	stratOfChecking := time.Now()
 
-	lastNCommandsFromQueueOne, err := queue.GetLastNCommands(sqsClient, queueOne, 1)
+	lastNCommandsFromQueueOne, err := queue.GetLastNCommands(ctx, sqsClient, queueOne, 1)
 	assert.NoError(t, err)
 
 	actualEventsFromQueueOne := make([]string, 1)
@@ -214,7 +244,7 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 		EventId:        firstOpenWorkflow.EventId,
 		TargetQueueUrl: queueOne,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualFirstWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualFirstWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualFirstWorkflow)
 	assert.WithinRange(t, actualFirstWorkflow.StartAt.ToTime(), startOfTesting.Add(sevenHours-time.Second), stratOfChecking.Add(sevenHours+time.Second))
@@ -225,14 +255,14 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 		EventId:        secondOpenWorkflow.EventId,
 		TargetQueueUrl: unknownQueue,
 	}
-	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(&actualSecondWorkflow)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Reconstitute(ctx, &actualSecondWorkflow)
 	assert.NoError(t, err)
 	assert.NotNil(t, actualSecondWorkflow)
 	assert.WithinRange(t, actualSecondWorkflow.StartAt.ToTime(), startOfTesting.Add(sevenHours-time.Second), stratOfChecking.Add(sevenHours+time.Second))
 	expectedAmountOfStartOfSecondWorkflow := secondOpenWorkflow.AmountOfStarts + 1
 	assert.Equal(t, expectedAmountOfStartOfSecondWorkflow, actualSecondWorkflow.AmountOfStarts)
 
-	lastNCommandsFromNotificationQueue, err := queue.GetLastNCommands(sqsClient, notificationQueueUrl, 1)
+	lastNCommandsFromNotificationQueue, err := queue.GetLastNCommands(ctx, sqsClient, notificationQueueUrl, 1)
 	assert.NoError(t, err)
 
 	expectedNotification := fmt.Sprintf(
@@ -272,22 +302,24 @@ func makeFifoWorkflowRecord(targetQueueUrl string, startAt time.Time) workflows.
 	return *workflow
 }
 
-func deleteAllWorkflows() (err error) {
-	workflows, err := dynamodbClient.Scan(&dynamodb.ScanInput{
+func deleteAllWorkflows(ctx context.Context) (err error) {
+	scanInput := &dynamodb.ScanInput{
 		TableName: aws.String(outboxer.workflowsTableName),
-	})
+	}
+	workflows, err := dynamodbClient.Scan(ctx, scanInput)
 	if err != nil {
 		return
 	}
 
 	for _, item := range workflows.Items {
-		_, err = dynamodbClient.DeleteItem(&dynamodb.DeleteItemInput{
+		deleteItemInput := &dynamodb.DeleteItemInput{
 			TableName: aws.String(outboxer.workflowsTableName),
-			Key: map[string]*dynamodb.AttributeValue{
+			Key: map[string]types.AttributeValue{
 				"event_id":         item["event_id"],
 				"target_queue_url": item["target_queue_url"],
 			},
-		})
+		}
+		_, err = dynamodbClient.DeleteItem(ctx, deleteItemInput)
 		if err != nil {
 			return
 		}

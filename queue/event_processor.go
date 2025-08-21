@@ -1,15 +1,18 @@
 package queue
 
 import (
+	"context"
+
 	"github.com/aws/aws-lambda-go/events"
 	"go.uber.org/zap"
 )
 
 type EventProcessor interface {
-	ProcessSingle(event *events.SQSMessage, logger *zap.Logger) (err error)
+	ProcessSingle(ctx context.Context, event *events.SQSMessage, logger *zap.Logger) (err error)
 }
 
 func ProcessMultiple(
+	ctx context.Context,
 	sqsEvents events.SQSEvent,
 	eventProcessor EventProcessor,
 	logger *zap.Logger,
@@ -20,7 +23,7 @@ func ProcessMultiple(
 	failures := []events.SQSBatchItemFailure{}
 
 	for _, event := range sqsEvents.Records {
-		errOfTheMessage := eventProcessor.ProcessSingle(&event, logger)
+		errOfTheMessage := eventProcessor.ProcessSingle(ctx, &event, logger)
 		if errOfTheMessage != nil {
 			eventFailure := &events.SQSBatchItemFailure{
 				ItemIdentifier: event.MessageId,

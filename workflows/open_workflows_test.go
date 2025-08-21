@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -12,32 +13,34 @@ import (
 func Test_OpenWorkflowsIndex_should_read_oldest_open_workflows_from_the_table(t *testing.T) {
 	var err error
 
+	ctx := context.TODO()
+
 	err = deleteAllWorkflows()
 	assert.NoError(t, err)
 
 	closedOldestWorkflowStartedAt := time.Date(2023, time.September, 16, 12, 45, 14, 0, time.UTC)
 	closedOldestWorkflowRecord := makeWorkflowRecord(closedOldestWorkflowStartedAt)
 	closedOldestWorkflowRecord.IsOpen = nil
-	err = workflowRecordTable.Action(dynamodbClient).Persist(closedOldestWorkflowRecord)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, closedOldestWorkflowRecord)
 	assert.NoError(t, err)
 
 	openOldestWorkflowStartedAt := time.Date(2023, time.September, 17, 12, 45, 14, 0, time.UTC)
 	openOldestWorkflowRecord := makeWorkflowRecord(openOldestWorkflowStartedAt)
-	err = workflowRecordTable.Action(dynamodbClient).Persist(openOldestWorkflowRecord)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, openOldestWorkflowRecord)
 	assert.NoError(t, err)
 
 	openOlderWorkflowStartedAt := time.Date(2023, time.September, 18, 12, 45, 14, 0, time.UTC)
 	openOlderWorkflowRecord := makeWorkflowRecord(openOlderWorkflowStartedAt)
-	err = workflowRecordTable.Action(dynamodbClient).Persist(openOlderWorkflowRecord)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, openOlderWorkflowRecord)
 	assert.NoError(t, err)
 
 	openNewestWorkflowStartedAt := time.Date(2023, time.September, 19, 12, 45, 14, 0, time.UTC)
 	openNewestWorkflowRecord := makeWorkflowRecord(openNewestWorkflowStartedAt)
-	err = workflowRecordTable.Action(dynamodbClient).Persist(openNewestWorkflowRecord)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, openNewestWorkflowRecord)
 	assert.NoError(t, err)
 
 	takeUntil := zulu.DateTimeFromTime(time.Date(2023, time.September, 20, 12, 45, 14, 0, time.UTC))
-	actualOldestOpenWorkflows, err := openWorkflowsIndex.OpenWorkflows(2, takeUntil)
+	actualOldestOpenWorkflows, err := openWorkflowsIndex.OpenWorkflows(ctx, 2, takeUntil)
 	assert.NoError(t, err)
 
 	expectedOldestOpenWorkflows := []WorkflowRecord{openOldestWorkflowRecord, openOlderWorkflowRecord}
@@ -47,32 +50,34 @@ func Test_OpenWorkflowsIndex_should_read_oldest_open_workflows_from_the_table(t 
 func Test_OpenWorkflowsIndex_should_not_go_further_than_the_given_time(t *testing.T) {
 	var err error
 
+	ctx := context.TODO()
+
 	err = deleteAllWorkflows()
 	assert.NoError(t, err)
 
 	closedOldestWorkflowStartedAt := time.Date(2023, time.September, 16, 12, 45, 14, 0, time.UTC)
 	closedOldestWorkflowRecord := makeWorkflowRecord(closedOldestWorkflowStartedAt)
 	closedOldestWorkflowRecord.IsOpen = nil
-	err = workflowRecordTable.Action(dynamodbClient).Persist(closedOldestWorkflowRecord)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, closedOldestWorkflowRecord)
 	assert.NoError(t, err)
 
 	openOldestWorkflowStartedAt := time.Date(2023, time.September, 17, 12, 45, 14, 0, time.UTC)
 	openOldestWorkflowRecord := makeWorkflowRecord(openOldestWorkflowStartedAt)
-	err = workflowRecordTable.Action(dynamodbClient).Persist(openOldestWorkflowRecord)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, openOldestWorkflowRecord)
 	assert.NoError(t, err)
 
 	openOlderWorkflowStartedAt := time.Date(2023, time.September, 18, 12, 45, 14, 0, time.UTC)
 	openOlderWorkflowRecord := makeWorkflowRecord(openOlderWorkflowStartedAt)
-	err = workflowRecordTable.Action(dynamodbClient).Persist(openOlderWorkflowRecord)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, openOlderWorkflowRecord)
 	assert.NoError(t, err)
 
 	openNewestWorkflowStartedAt := time.Date(2023, time.September, 19, 12, 45, 14, 0, time.UTC)
 	openNewestWorkflowRecord := makeWorkflowRecord(openNewestWorkflowStartedAt)
-	err = workflowRecordTable.Action(dynamodbClient).Persist(openNewestWorkflowRecord)
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, openNewestWorkflowRecord)
 	assert.NoError(t, err)
 
 	takeUntil := zulu.DateTimeFromTime(time.Date(2023, time.September, 18, 11, 45, 14, 0, time.UTC))
-	actualOldestOpenWorkflows, err := openWorkflowsIndex.OpenWorkflows(4, takeUntil)
+	actualOldestOpenWorkflows, err := openWorkflowsIndex.OpenWorkflows(ctx, 4, takeUntil)
 	assert.NoError(t, err)
 
 	expectedOldestOpenWorkflows := []WorkflowRecord{openOldestWorkflowRecord}

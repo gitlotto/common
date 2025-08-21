@@ -37,6 +37,11 @@ setup:
 	@samlocal deploy --template-file outboxer/.dev/notification.yaml --stack-name outboxer_notification --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND --s3-bucket gitlotto --parameter-overrides TheStackName=outboxer_notification
 	@echo "💾 outboxer stack deployed"
 
+	@samlocal deploy --template-file direct_pass/.dev/db.yaml --stack-name direct_passer_dynamodb --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND --s3-bucket gitlotto --parameter-overrides TheStackName=direct_passer_dynamodb
+	@samlocal deploy --template-file direct_pass/.dev/queues.yaml --stack-name direct_passer_queues --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND --s3-bucket gitlotto --parameter-overrides TheStackName=direct_passer_queues
+	@samlocal deploy --template-file direct_pass/.dev/notification.yaml --stack-name direct_passer_notification --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND --s3-bucket gitlotto --parameter-overrides TheStackName=direct_passer_notification
+	@echo "💾 direct_passer stack deployed"
+
 	@samlocal deploy --template-file workflows/.dev/db.yaml --stack-name workflows --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND --s3-bucket gitlotto --parameter-overrides TheStackName=workflows
 	@echo "💾 workflows stack deployed"
 
@@ -53,9 +58,9 @@ ci_down:
 	@echo "✅ Docker containers stopped and removed"
 
 # Full reset: stop everything, start, and setup
-dev_reset: dev_down dev_up dev_setup
+dev_reset: dev_down dev_up setup
 
-ci_reset: ci_down ci_up ci_setup
+ci_reset: ci_down ci_up setup
 
 # Test and deploy for all modules
 test:
@@ -65,6 +70,7 @@ test:
 	cd env_var && go test ./... -v -count=1 -p 1 && cd ..
 	cd workflows && go test ./... -v -count=1 -p 1 && cd ..
 	cd outboxer && go test ./... -v -count=1 -p 1 && cd ..
+	cd direct_pass && go test ./... -v -count=1 -p 1 && cd ..
 	cd zulu && go test ./... -v -count=1 -p 1 && cd ..
 
 # Create tags for all modules with the same version (local only)

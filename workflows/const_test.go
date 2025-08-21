@@ -1,23 +1,33 @@
 package workflows
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/gitlotto/common/database"
 )
 
 const workflowsTableName = "workflows-workflows"
 const openWorkflowsIndexName = "workflows-openWorkflows"
 
-var awsConfig = aws.Config{
-	Region:     aws.String("us-east-1"),
-	Endpoint:   aws.String("http://localhost:4566"), // this is the LocalStack endpoint for all services
-	DisableSSL: aws.Bool(true),
+var dynamodbClient *dynamodb.Client
+
+func setup() bool {
+	ctx := context.Background()
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
+	if err != nil {
+		panic(err)
+	}
+	dynamodbClient = dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String("http://localhost:4566")
+	})
+	return true
 }
 
-var awsSession = session.Must(session.NewSession(&awsConfig))
-var dynamodbClient = dynamodb.New(awsSession)
+var _ = setup()
 
 type Event struct {
 	PartitionKey string  `json:"partitionKey"`
@@ -26,7 +36,9 @@ type Event struct {
 
 var workflowRecordTable = WorkflowRecordTable{
 	Table: database.Table[WorkflowRecord]{
-		Name: workflowsTableName,
+		Name:         workflowsTableName,
+		PartitionKey: "event_id",
+		SortKey:      aws.String("target_queue_url"),
 	},
 	DynamodbClient: dynamodbClient,
 }
@@ -38,21 +50,24 @@ var openWorkflowsIndex = OpenWorkflowsIndex{
 }
 
 func deleteAllWorkflows() (err error) {
-	workflows, err := dynamodbClient.Scan(&dynamodb.ScanInput{
+	ctx := context.TODO()
+	scanInput := &dynamodb.ScanInput{
 		TableName: aws.String(workflowsTableName),
-	})
+	}
+	workflows, err := dynamodbClient.Scan(ctx, scanInput)
 	if err != nil {
 		return
 	}
 
 	for _, item := range workflows.Items {
-		_, err = dynamodbClient.DeleteItem(&dynamodb.DeleteItemInput{
+		deleteInput := &dynamodb.DeleteItemInput{
 			TableName: aws.String(workflowsTableName),
-			Key: map[string]*dynamodb.AttributeValue{
+			Key: map[string]types.AttributeValue{
 				"event_id":         item["event_id"],
 				"target_queue_url": item["target_queue_url"],
 			},
-		})
+		}
+		_, err = dynamodbClient.DeleteItem(ctx, deleteInput)
 		if err != nil {
 			return
 		}

@@ -1,29 +1,23 @@
 package notification
 
 import (
+	"context"
 	"encoding/json"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sns"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/google/uuid"
 )
 
 const onlyOneMessageGroupId string = "0"
 
 type Postman struct {
-	snsClient *sns.SNS
-	topicArn  string
+	SnsClient *sns.Client
+	TopicArn  string
 }
 
-func NewPostman(session *session.Session, topicArn string) *Postman {
-	return &Postman{
-		snsClient: sns.New(session),
-		topicArn:  topicArn,
-	}
-}
-
-func (postman *Postman) SendNotification(requestId string, message string) (err error) {
+func (postman *Postman) SendNotification(ctx context.Context, requestId string, message string) (err error) {
 	notification := JobNotification{
 		RequestId: requestId,
 		Message:   message,
@@ -38,17 +32,19 @@ func (postman *Postman) SendNotification(requestId string, message string) (err 
 
 	deduplicationId := uuid.New().String()
 
-	_, err = postman.snsClient.Publish(&sns.PublishInput{
+	publishInput := &sns.PublishInput{
 		Message:                aws.String(messageBody),
-		TopicArn:               &postman.topicArn,
+		TopicArn:               &postman.TopicArn,
 		MessageGroupId:         aws.String(onlyOneMessageGroupId),
 		MessageDeduplicationId: aws.String(deduplicationId),
-		MessageAttributes: map[string]*sns.MessageAttributeValue{
+		MessageAttributes: map[string]types.MessageAttributeValue{
 			"NotificationType": {
 				DataType:    aws.String("String"),
 				StringValue: aws.String("Job"),
 			},
 		},
-	})
+	}
+
+	_, err = postman.SnsClient.Publish(ctx, publishInput)
 	return
 }

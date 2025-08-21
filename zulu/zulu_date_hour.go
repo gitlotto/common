@@ -3,8 +3,7 @@ package zulu
 import (
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 type DateHour struct {
@@ -40,22 +39,26 @@ func (z DateHour) ToDate() Date {
 	return z.Date
 }
 
-func (e DateHour) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	av.S = aws.String(e.String())
-	av.N = nil
-	return nil
+// MarshalDynamoDBAttributeValue implements attributevalue.Marshaler for AWS SDK v2
+func (e DateHour) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	return &types.AttributeValueMemberS{Value: e.String()}, nil
 }
 
-func (e *DateHour) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
-	if av.S == nil || *av.S == "" {
+// UnmarshalDynamoDBAttributeValue implements attributevalue.Unmarshaler for AWS SDK v2
+func (e *DateHour) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	switch v := av.(type) {
+	case *types.AttributeValueMemberS:
+		if v.Value == "" {
+			return nil
+		}
+		t, err := time.Parse("2006-01-02T15Z", v.Value)
+		if err != nil {
+			return err
+		}
+		t = t.UTC()
+		e.Date = DateFromTime(t)
+		e.hour = t.Hour()
 		return nil
 	}
-	t, err := time.Parse("2006-01-02T15Z", *av.S)
-	t = t.UTC()
-	if err != nil {
-		return err
-	}
-	e.Date = DateFromTime(t)
-	e.hour = t.Hour()
 	return nil
 }
