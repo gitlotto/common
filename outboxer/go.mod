@@ -15,13 +15,13 @@ require (
 )
 
 require (
-	github.com/gitlotto/common/database v0.21.0
-	github.com/gitlotto/common/env_var v0.21.0
-	github.com/gitlotto/common/logging v0.21.0
-	github.com/gitlotto/common/notification v0.21.0
-	github.com/gitlotto/common/queue v0.21.0
-	github.com/gitlotto/common/workflows v0.21.0
-	github.com/gitlotto/common/zulu v0.21.0
+	github.com/gitlotto/common/database v0.22.0
+	github.com/gitlotto/common/env_var v0.22.0
+	github.com/gitlotto/common/logging v0.22.0
+	github.com/gitlotto/common/notification v0.22.0
+	github.com/gitlotto/common/queue v0.22.0
+	github.com/gitlotto/common/workflows v0.22.0
+	github.com/gitlotto/common/zulu v0.22.0
 )
 
 require (
