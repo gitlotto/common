@@ -40,7 +40,7 @@ require (
 	github.com/gitlotto/common/logging v0.22.0
 	github.com/gitlotto/common/notification v0.22.0
 	github.com/gitlotto/common/queue v0.22.0
-	github.com/gitlotto/common/workflows v0.22.0
+	github.com/gitlotto/common/workflows v0.22.1
 	github.com/gitlotto/common/zulu v0.22.0
 	go.uber.org/zap v1.27.0
 )
