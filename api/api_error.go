@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -64,9 +65,9 @@ func (invalid ValidationError) Error() string {
 	return invalid.Message
 }
 
-func WithRecover(handler func(*events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error)) func(*events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	recovered := func(requestEvent *events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-		responseEvent, err := handler(requestEvent)
+func WithRecover(handler func(context.Context, *events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error)) func(context.Context, *events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	recovered := func(ctx context.Context, requestEvent *events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+		responseEvent, err := handler(ctx, requestEvent)
 		if err != nil {
 			switch err := err.(type) {
 			case ApiError:
