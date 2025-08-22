@@ -6,10 +6,7 @@ require github.com/google/uuid v1.6.0
 
 require github.com/davecgh/go-spew v1.1.1 // indirect
 
-require (
-	github.com/gitlotto/common/zulu v0.0.0-00010101000000-000000000000
-	github.com/stretchr/testify v1.9.0
-)
+require github.com/stretchr/testify v1.9.0
 
 require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.5 // indirect
@@ -34,6 +31,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.31.1
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.20.5
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.49.0
-	github.com/gitlotto/common/database v0.0.0-00010101000000-000000000000
+	github.com/gitlotto/common/database v0.21.0
+	github.com/gitlotto/common/zulu v0.21.0
 )
-

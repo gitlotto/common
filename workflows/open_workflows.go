@@ -2,7 +2,6 @@ package workflows
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -17,16 +16,12 @@ type OpenWorkflowsIndex struct {
 	DynamodbClient *dynamodb.Client
 }
 
+func (index OpenWorkflowsIndex) ZZZ(ctx context.Context) (s string, err error) {
+	return
+}
+
 func (index OpenWorkflowsIndex) OpenWorkflows(ctx context.Context, limit int, until zulu.DateTime) (workflowRecords []WorkflowRecord, err error) {
 
-	fmt.Println("PROVING THAT UNCOMMITTED CHANGES ARE PICKED UP BY TESTS")
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
 	queryInput := &dynamodb.QueryInput{
 		TableName:              &index.TableName,
 		IndexName:              &index.IndexName,
