@@ -45,16 +45,5 @@ require (
 	go.uber.org/zap v1.27.0
 )
 
-replace github.com/gitlotto/common/workflows => ../workflows
 
-replace github.com/gitlotto/common/database => ../database
 
-replace github.com/gitlotto/common/env_var => ../env_var
-
-replace github.com/gitlotto/common/logging => ../logging
-
-replace github.com/gitlotto/common/notification => ../notification
-
-replace github.com/gitlotto/common/queue => ../queue
-
-replace github.com/gitlotto/common/zulu => ../zulu

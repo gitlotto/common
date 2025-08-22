@@ -41,17 +41,3 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/gitlotto/common/workflows => ../workflows
-
-replace github.com/gitlotto/common/database => ../database
-
-replace github.com/gitlotto/common/env_var => ../env_var
-
-replace github.com/gitlotto/common/zulu => ../zulu
-
-replace github.com/gitlotto/common/logging => ../logging
-
-replace github.com/gitlotto/common/notification => ../notification
-
-replace github.com/gitlotto/common/queue => ../queue
