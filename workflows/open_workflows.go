@@ -16,10 +16,6 @@ type OpenWorkflowsIndex struct {
 	DynamodbClient *dynamodb.Client
 }
 
-func (index OpenWorkflowsIndex) ZZZ(ctx context.Context) (s string, err error) {
-	return
-}
-
 func (index OpenWorkflowsIndex) OpenWorkflows(ctx context.Context, limit int, until zulu.DateTime) (workflowRecords []WorkflowRecord, err error) {
 
 	queryInput := &dynamodb.QueryInput{

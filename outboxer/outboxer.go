@@ -59,14 +59,6 @@ func (outboxer *Outboxer) Outbox(ctx context.Context, requestId string) (err err
 
 	now := time.Now()
 
-	s, err := openWorkflowIndex.ZZZ(ctx)
-	if err != nil {
-		logger.Error("impossible to fetch open workflows", zap.Error(err))
-	}
-	fmt.Println(s)
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
-	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx")
-
 	workflowRecords, err := openWorkflowIndex.OpenWorkflows(ctx, outboxer.amountOfWorkflowsToOutbox, zulu.DateTimeFromTime(now))
 
 	logger = logger.With(zap.Int("amountOfWorkflows", len(workflowRecords)))
