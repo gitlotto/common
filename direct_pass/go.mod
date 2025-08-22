@@ -35,26 +35,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.49.0
 	github.com/aws/aws-sdk-go-v2/service/sns v1.37.1
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.41.1
-	github.com/gitlotto/common/database v0.0.0-00010101000000-000000000000
-	github.com/gitlotto/common/env_var v0.0.0-00010101000000-000000000000
-	github.com/gitlotto/common/logging v0.0.0-00010101000000-000000000000
-	github.com/gitlotto/common/notification v0.0.0-00010101000000-000000000000
-	github.com/gitlotto/common/queue v0.0.0-00010101000000-000000000000
-	github.com/gitlotto/common/workflows v0.0.0-00010101000000-000000000000
-	github.com/gitlotto/common/zulu v0.0.0-00010101000000-000000000000
+	github.com/gitlotto/common/database v0.21.0
+	github.com/gitlotto/common/env_var v0.21.0
+	github.com/gitlotto/common/logging v0.21.0
+	github.com/gitlotto/common/notification v0.21.0
+	github.com/gitlotto/common/queue v0.21.0
+	github.com/gitlotto/common/workflows v0.21.0
+	github.com/gitlotto/common/zulu v0.21.0
 	go.uber.org/zap v1.27.0
 )
-
-replace github.com/gitlotto/common/workflows => ../workflows
-
-replace github.com/gitlotto/common/database => ../database
-
-replace github.com/gitlotto/common/env_var => ../env_var
-
-replace github.com/gitlotto/common/logging => ../logging
-
-replace github.com/gitlotto/common/notification => ../notification
-
-replace github.com/gitlotto/common/queue => ../queue
-
-replace github.com/gitlotto/common/zulu => ../zulu

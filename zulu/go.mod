@@ -3,7 +3,7 @@ module github.com/gitlotto/common/zulu
 go 1.24.6
 
 require (
-	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.49.0
+	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.49.1
 	github.com/stretchr/testify v1.9.0
 )
 

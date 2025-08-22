@@ -2,7 +2,7 @@ module github.com/gitlotto/common/api
 
 go 1.24.6
 
-require github.com/aws/aws-lambda-go v1.47.0
+require github.com/aws/aws-lambda-go v1.49.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

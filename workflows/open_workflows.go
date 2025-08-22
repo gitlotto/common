@@ -17,6 +17,7 @@ type OpenWorkflowsIndex struct {
 }
 
 func (index OpenWorkflowsIndex) OpenWorkflows(ctx context.Context, limit int, until zulu.DateTime) (workflowRecords []WorkflowRecord, err error) {
+
 	queryInput := &dynamodb.QueryInput{
 		TableName:              &index.TableName,
 		IndexName:              &index.IndexName,
