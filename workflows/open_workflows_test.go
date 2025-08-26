@@ -92,8 +92,9 @@ func makeWorkflowRecord(startAt time.Time) WorkflowRecord {
 	targetQueueUrl := uuid.New().String() + ".fifo"
 	event := "event"
 	eventGroupId := uuid.New().String()
+	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId)
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId, baggage)
 	if err != nil {
 		panic(err)
 	}

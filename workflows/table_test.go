@@ -27,7 +27,8 @@ func Test_WorkflowRecordTable_should_postpone_the_workflow_if_it_is_still_open(t
 	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":"%s"}`, partitionKey, sortKey)
 	eventGroupId := uuid.New().String()
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{}
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -69,7 +70,9 @@ func Test_WorkflowRecordTable_should_not_postpone_the_workflow_if_it_had_been_cl
 	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":"%s"}`, partitionKey, sortKey)
 	eventGroupId := uuid.New().String()
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{}
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -110,7 +113,9 @@ func Test_WorkflowRecordTable_should_close_the_workflow_if_it_is_still_open(t *t
 	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":"%s"}`, partitionKey, sortKey)
 	eventGroupId := uuid.New().String()
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{}
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -152,7 +157,9 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_if_it_had_been_close
 	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":"%s"}`, partitionKey, sortKey)
 	eventGroupId := uuid.New().String()
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{}
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -193,7 +200,9 @@ func Test_WorkflowRecordTable_should_close_the_workflow_in_a_transaction_if_it_i
 	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":"%s"}`, partitionKey, sortKey)
 	eventGroupId := uuid.New().String()
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{}
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -239,7 +248,9 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_in_a_transaction_if_
 	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":"%s"}`, partitionKey, sortKey)
 	eventGroupId := uuid.New().String()
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{}
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -283,7 +294,9 @@ func Test_WorkflowRecordTable_should_create_a_workflow_in_a_transaction_if_it_ha
 	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":"%s"}`, partitionKey, sortKey)
 	eventGroupId := uuid.New().String()
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{}
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -320,7 +333,9 @@ func Test_WorkflowRecordTable_should_not_create_a_workflow_if_it_has_not_been_cr
 	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":"%s"}`, partitionKey, sortKey)
 	eventGroupId := uuid.New().String()
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{}
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
