@@ -15,15 +15,16 @@ func ErrFifoWorkflowQueueMismatch(queueUrl string) error {
 }
 
 type WorkflowRecord struct {
-	EventId             string         `dynamodbav:"event_id"`
-	TargetQueueUrl      string         `dynamodbav:"target_queue_url"`
-	CreatedAt           zulu.DateTime  `dynamodbav:"created_at"`
-	StartAt             zulu.DateTime  `dynamodbav:"start_at"`
-	AmountOfStarts      int            `dynamodbav:"amount_of_starts"`
-	IsOpen              *IsOpen        `dynamodbav:"is_open,omitempty"`
-	FinishedAt          *zulu.DateTime `dynamodbav:"finished_at,omitempty"`
-	Event               string         `dynamodbav:"event"`
-	EventMessageGroupId string         `dynamodbav:"event_message_group_id"`
+	EventId             string            `dynamodbav:"event_id"`
+	TargetQueueUrl      string            `dynamodbav:"target_queue_url"`
+	CreatedAt           zulu.DateTime     `dynamodbav:"created_at"`
+	StartAt             zulu.DateTime     `dynamodbav:"start_at"`
+	AmountOfStarts      int               `dynamodbav:"amount_of_starts"`
+	IsOpen              *IsOpen           `dynamodbav:"is_open,omitempty"`
+	FinishedAt          *zulu.DateTime    `dynamodbav:"finished_at,omitempty"`
+	Event               string            `dynamodbav:"event"`
+	EventMessageGroupId string            `dynamodbav:"event_message_group_id"`
+	Baggage             map[string]string `dynamodbav:"baggage"`
 }
 
 func (record WorkflowRecord) PartitionKey() types.AttributeValue {
@@ -54,6 +55,7 @@ func NewFifoWorkflowRecord(
 	targetQueueUrl string,
 	event string,
 	eventGroupId string,
+	baggage map[string]string,
 ) (*WorkflowRecord, error) {
 	if targetQueueUrl == "" || !strings.HasSuffix(targetQueueUrl, ".fifo") {
 		return nil, ErrFifoWorkflowQueueMismatch(targetQueueUrl)
@@ -71,6 +73,7 @@ func NewFifoWorkflowRecord(
 		TargetQueueUrl:      targetQueueUrl,
 		Event:               event,
 		EventMessageGroupId: eventGroupId,
+		Baggage:             baggage,
 	}
 	return &workflowRecord, nil
 }
