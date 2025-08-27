@@ -50,8 +50,8 @@ github.com/gitlotto/common/notification v0.22.0 h1:bQQpYIln4ogREl3iLPFMJToWNhOGE
 github.com/gitlotto/common/notification v0.22.0/go.mod h1:m5Wt8f7LGgXJmZ0wJaZWq8ikfDKS14K/3MMxpcWzPy0=
 github.com/gitlotto/common/queue v0.22.0 h1:l5x7w0sb0+B/mBEIwIrwueoLhWuNtxzq/ZP4maQRtL0=
 github.com/gitlotto/common/queue v0.22.0/go.mod h1:wJMl2exlK3mfZW9yJm9LyWOzyHaWa3U429q72mH7rMY=
-github.com/gitlotto/common/workflows v0.22.1 h1:ucQzlBEVPwQtKBW1UAvGqeYJNk8VFWNdO3q1+uT4jsY=
-github.com/gitlotto/common/workflows v0.22.1/go.mod h1:TtdVVmqtukNiL1zreSPj55gb0JYwG01OW9E3+cktLRM=
+github.com/gitlotto/common/workflows v0.23.0 h1:3WCT8eZjK7zV8UhIEPJpm3vXDXjhaFdiKbP++rMgACU=
+github.com/gitlotto/common/workflows v0.23.0/go.mod h1:TtdVVmqtukNiL1zreSPj55gb0JYwG01OW9E3+cktLRM=
 github.com/gitlotto/common/zulu v0.22.0 h1:5HoF3KLUGBtAKJadlKW+dECyx3Hl3HD26aa4DrXIkB4=
 github.com/gitlotto/common/zulu v0.22.0/go.mod h1:KD3Te2ExGlR22z92a9ouJMrSYmI6DfyLhz0QB/uhRho=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=

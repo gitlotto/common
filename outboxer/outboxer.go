@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const otelAttributeKeyPrefix = "gitlotto.otel."
+
 type Outboxer struct {
 	workflowsTableName        string
 	openWorkflowsIndexName    string
@@ -96,6 +98,15 @@ func (outboxer *Outboxer) Outbox(ctx context.Context, requestId string) (err err
 				},
 			},
 		}
+
+		for key, value := range workflowRecord.Baggage {
+			specialKey := otelAttributeKeyPrefix + key
+			sendMessageInput.MessageAttributes[specialKey] = types.MessageAttributeValue{
+				DataType:    aws.String("String"),
+				StringValue: aws.String(value),
+			}
+		}
+
 		_, errFromEventSending := outboxer.sqsClient.SendMessage(ctx, sendMessageInput)
 
 		if errFromEventSending != nil {
