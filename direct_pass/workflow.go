@@ -84,5 +84,16 @@ func unmarshalWorkflow(attributes map[string]events.DynamoDBAttributeValue) (rec
 		err = ErrInvalidWorkflowRecord("event_message_group_id")
 	}
 
+	if attr, ok := attributes["baggage"]; ok && attr.DataType() == events.DataTypeMap {
+		record.Baggage = make(map[string]string)
+		for key, value := range attr.Map() {
+			if value.DataType() == events.DataTypeString {
+				record.Baggage[key] = value.String()
+			}
+		}
+	} else {
+		err = ErrInvalidWorkflowRecord("baggage")
+	}
+
 	return
 }

@@ -25,6 +25,16 @@ func Test_open_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(t 
 
 	eventId := fmt.Sprintf("%s#%s", tableName, partitionKey)
 
+	baggage := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+
+	baggageAsAttribute := map[string]events.DynamoDBAttributeValue{
+		"key1": events.NewStringAttribute("value1"),
+		"key2": events.NewStringAttribute("value2"),
+	}
+
 	newImage := map[string]events.DynamoDBAttributeValue{
 		"event_id":               events.NewStringAttribute(eventId),
 		"created_at":             events.NewStringAttribute(createdAt.String()),
@@ -34,9 +44,10 @@ func Test_open_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(t 
 		"is_open":                events.NewStringAttribute(string(workflows.Open)),
 		"event":                  events.NewStringAttribute(event),
 		"event_message_group_id": events.NewStringAttribute(eventGroupId),
+		"baggage":                events.NewMapAttribute(baggageAsAttribute),
 	}
 
-	expectedWorkflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	expectedWorkflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	assert.NoError(t, err)
 
 	actualWorkflow, err := unmarshalWorkflow(newImage)
@@ -59,6 +70,11 @@ func Test_closed_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(
 
 	eventId := fmt.Sprintf("%s#%s", tableName, partitionKey)
 
+	baggageAsAttribute := map[string]events.DynamoDBAttributeValue{
+		"key1": events.NewStringAttribute("value1"),
+		"key2": events.NewStringAttribute("value2"),
+	}
+
 	newImage := map[string]events.DynamoDBAttributeValue{
 		"event_id":               events.NewStringAttribute(eventId),
 		"created_at":             events.NewStringAttribute(createdAt.String()),
@@ -68,9 +84,15 @@ func Test_closed_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(
 		"finished_at":            events.NewStringAttribute(finishedAt.String()),
 		"event":                  events.NewStringAttribute(event),
 		"event_message_group_id": events.NewStringAttribute(eventGroupId),
+		"baggage":                events.NewMapAttribute(baggageAsAttribute),
 	}
 
-	expectedWorkflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+
+	expectedWorkflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
 	expectedWorkflow.FinishedAt = &finishedAt
 	expectedWorkflow.IsOpen = nil
 	assert.NoError(t, err)

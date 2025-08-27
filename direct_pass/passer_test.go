@@ -90,6 +90,11 @@ func Test_Workflow_Direct_passer_should_write_the_workflow_into_the_sqs(t *testi
 	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, workflow)
 	assert.NoError(t, err)
 
+	baggageAsAttribute := map[string]events.DynamoDBAttributeValue{
+		"key1": events.NewStringAttribute("value1"),
+		"key2": events.NewStringAttribute("value2"),
+	}
+
 	event := events.DynamoDBEvent{
 		Records: []events.DynamoDBEventRecord{
 			{
@@ -105,6 +110,7 @@ func Test_Workflow_Direct_passer_should_write_the_workflow_into_the_sqs(t *testi
 						"event":                  events.NewStringAttribute(workflow.Event),
 						"event_message_group_id": events.NewStringAttribute(workflow.EventMessageGroupId),
 						"is_open":                events.NewStringAttribute("OPEN"),
+						"baggage":                events.NewMapAttribute(baggageAsAttribute),
 					},
 				},
 			},
@@ -118,15 +124,19 @@ func Test_Workflow_Direct_passer_should_write_the_workflow_into_the_sqs(t *testi
 	stratOfChecking = stratOfChecking.Add(time.Second)
 
 	lastNCommandsFromQueue, err := queue.GetLastNCommands(ctx, sqsClient, queueName, 1)
+	assert.Equal(t, 1, len(lastNCommandsFromQueue))
 	assert.NoError(t, err)
 
-	actualEventsFromQueue := make([]string, 1)
-	for i, command := range lastNCommandsFromQueue {
-		actualEventsFromQueue[i] = *command.Body
-	}
+	actualMessageFromQueue := lastNCommandsFromQueue[0]
 
-	expectedEventsFromQueue := []string{workflow.Event}
-	assert.ElementsMatch(t, expectedEventsFromQueue, actualEventsFromQueue)
+	fmt.Println(actualMessageFromQueue.MessageAttributes)
+	// assert.Equal(t, "value1", *actualMessageFromQueueOne.MessageAttributes["key1"].StringValue)
+	// assert.Equal(t, "value2", *actualMessageFromQueueOne.MessageAttributes["key2"].StringValue)
+
+	actualEventBodyFromQueue := actualMessageFromQueue.Body
+
+	expectedEventBodyFromQueue := workflow.Event
+	assert.Equal(t, expectedEventBodyFromQueue, *actualEventBodyFromQueue)
 
 	actualWorkflow := workflows.WorkflowRecord{
 		EventId:        workflow.EventId,
@@ -148,6 +158,11 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, workflow)
 	assert.NoError(t, err)
 
+	baggageAsAttribute := map[string]events.DynamoDBAttributeValue{
+		"key1": events.NewStringAttribute("value1"),
+		"key2": events.NewStringAttribute("value2"),
+	}
+
 	event := events.DynamoDBEvent{
 		Records: []events.DynamoDBEventRecord{
 			{
@@ -163,6 +178,7 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 						"event":                  events.NewStringAttribute(workflow.Event),
 						"event_message_group_id": events.NewStringAttribute(workflow.EventMessageGroupId),
 						"is_open":                events.NewStringAttribute("OPEN"),
+						"baggage":                events.NewMapAttribute(baggageAsAttribute),
 					},
 				},
 			},
@@ -194,6 +210,11 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, workflow)
 	assert.NoError(t, err)
 
+	baggageAsAttribute := map[string]events.DynamoDBAttributeValue{
+		"key1": events.NewStringAttribute("value1"),
+		"key2": events.NewStringAttribute("value2"),
+	}
+
 	event := events.DynamoDBEvent{
 		Records: []events.DynamoDBEventRecord{
 			{
@@ -209,6 +230,7 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 						"event":                  events.NewStringAttribute(workflow.Event),
 						"event_message_group_id": events.NewStringAttribute(workflow.EventMessageGroupId),
 						"is_open":                events.NewStringAttribute("OPEN"),
+						"baggage":                events.NewMapAttribute(baggageAsAttribute),
 					},
 				},
 			},
@@ -242,6 +264,11 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, workflow)
 	assert.NoError(t, err)
 
+	baggageAsAttribute := map[string]events.DynamoDBAttributeValue{
+		"key1": events.NewStringAttribute("value1"),
+		"key2": events.NewStringAttribute("value2"),
+	}
+
 	eventId := uuid.New().String()
 
 	event := events.DynamoDBEvent{
@@ -258,6 +285,7 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 						"event":                  events.NewStringAttribute(workflow.Event),
 						"event_message_group_id": events.NewStringAttribute(workflow.EventMessageGroupId),
 						"is_open":                events.NewStringAttribute("OPEN"),
+						"baggage":                events.NewMapAttribute(baggageAsAttribute),
 					},
 				},
 			},
@@ -300,7 +328,12 @@ func makeFifoWorkflowRecord(targetQueueUrl string, startAt time.Time) workflows.
 	createdAt := zulu.DateTimeFromTime(time.Date(2023, time.September, 16, 12, 45, 14, 0, time.UTC))
 	event := uuid.New().String()
 	eventGroupId := uuid.New().String()
-	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+
+	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId, baggage)
 	if err != nil {
 		panic(err)
 	}

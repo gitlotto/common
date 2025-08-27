@@ -91,13 +91,13 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 	assert.NoError(t, err)
 
 	oldClosedWorkflowStartAt := startOfTesting.Add(-time.Hour * 5)
-	oldClosedWorkflow := makeSimpleWorkflowRecord(queueOne, oldClosedWorkflowStartAt)
+	oldClosedWorkflow := makeFifoWorkflowRecord(queueOne, oldClosedWorkflowStartAt)
 	oldClosedWorkflow.IsOpen = nil
 	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, oldClosedWorkflow)
 	assert.NoError(t, err)
 
 	firstOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 4)
-	firstOpenWorkflow := makeSimpleWorkflowRecord(queueOne, firstOpenWorkflowStartAt)
+	firstOpenWorkflow := makeFifoWorkflowRecord(queueOne, firstOpenWorkflowStartAt)
 	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, firstOpenWorkflow)
 	assert.NoError(t, err)
 
@@ -107,7 +107,7 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 	assert.NoError(t, err)
 
 	thirdOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 2)
-	thirdOpenWorkflow := makeSimpleWorkflowRecord(queueOne, thirdOpenWorkflowStartAt)
+	thirdOpenWorkflow := makeFifoWorkflowRecord(queueOne, thirdOpenWorkflowStartAt)
 	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, thirdOpenWorkflow)
 	assert.NoError(t, err)
 
@@ -202,6 +202,38 @@ func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_even
 
 }
 
+func Test_Workflow_Outboxer_should_pick_the_oldest_open_workflows_and_issue_events_with_baggage(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+
+	startOfTesting := time.Now()
+
+	err = deleteAllWorkflows(ctx)
+	assert.NoError(t, err)
+
+	openWorkflowStartAt := startOfTesting.Add(-time.Hour * 4)
+	openWorkflow := makeFifoWorkflowRecord(queueOne, openWorkflowStartAt)
+	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, openWorkflow)
+	assert.NoError(t, err)
+
+	requestId := uuid.New().String()
+	err = outboxer.Outbox(ctx, requestId)
+	assert.NoError(t, err)
+
+	lastNCommandsFromQueueOne, err := queue.GetLastNCommands(ctx, sqsClient, queueOne, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(lastNCommandsFromQueueOne))
+
+	actualMessageFromQueueOne := lastNCommandsFromQueueOne[0]
+
+	// localstack does not return message attributes
+	fmt.Println(actualMessageFromQueueOne.MessageAttributes)
+	// assert.Equal(t, "value1", *actualMessageFromQueueOne.MessageAttributes["key1"].StringValue)
+	// assert.Equal(t, "value2", *actualMessageFromQueueOne.MessageAttributes["key2"].StringValue)
+
+}
+
 func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *testing.T) {
 	var err error
 
@@ -213,7 +245,7 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 	assert.NoError(t, err)
 
 	firstOpenWorkflowStartAt := startOfTesting.Add(-time.Hour * 4)
-	firstOpenWorkflow := makeSimpleWorkflowRecord(queueOne, firstOpenWorkflowStartAt)
+	firstOpenWorkflow := makeFifoWorkflowRecord(queueOne, firstOpenWorkflowStartAt)
 	err = workflowsDynamodbTable.Action(dynamodbClient).Persist(ctx, firstOpenWorkflow)
 	assert.NoError(t, err)
 
@@ -274,20 +306,6 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 	assert.Equal(t, expectedNotification, *actualNotification)
 }
 
-func makeSimpleWorkflowRecord(targetQueueUrl string, startAt time.Time) workflows.WorkflowRecord {
-	tableName := uuid.New().String()
-	partitionKey := uuid.New().String()
-	sortKey := uuid.New().String()
-	createdAt := zulu.DateTimeFromTime(time.Date(2023, time.September, 16, 12, 45, 14, 0, time.UTC))
-	event := uuid.New().String()
-	eventGroupId := uuid.New().String()
-	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId)
-	if err != nil {
-		panic(err)
-	}
-	return *workflow
-}
-
 func makeFifoWorkflowRecord(targetQueueUrl string, startAt time.Time) workflows.WorkflowRecord {
 	tableName := uuid.New().String()
 	partitionKey := uuid.New().String()
@@ -295,7 +313,11 @@ func makeFifoWorkflowRecord(targetQueueUrl string, startAt time.Time) workflows.
 	createdAt := zulu.DateTimeFromTime(time.Date(2023, time.September, 16, 12, 45, 14, 0, time.UTC))
 	event := uuid.New().String()
 	eventGroupId := uuid.New().String()
-	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId)
+	baggage := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId, baggage)
 	if err != nil {
 		panic(err)
 	}
