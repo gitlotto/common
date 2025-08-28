@@ -95,5 +95,11 @@ func unmarshalWorkflow(attributes map[string]events.DynamoDBAttributeValue) (rec
 		err = ErrInvalidWorkflowRecord("baggage")
 	}
 
+	if attr, ok := attributes["span_context_json"]; ok && attr.DataType() == events.DataTypeString {
+		record.SpanContextJson = attr.String()
+	} else {
+		err = ErrInvalidWorkflowRecord("span_context_json")
+	}
+
 	return
 }

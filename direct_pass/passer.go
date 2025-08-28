@@ -18,8 +18,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const otelAttributeKeyPrefix = "gitlotto.otel."
-
 type DirectPasser struct {
 	workflowsTableName   string
 	notificationTopicArn string
@@ -104,10 +102,16 @@ func (passer *DirectPasser) Pass(ctx context.Context, event events.DynamoDBEvent
 		}
 
 		for key, value := range workflowRecord.Baggage {
-			specialKey := otelAttributeKeyPrefix + key
-			inputMessage.MessageAttributes[specialKey] = types.MessageAttributeValue{
+			inputMessage.MessageAttributes[key] = types.MessageAttributeValue{
 				DataType:    aws.String("String"),
 				StringValue: aws.String(value),
+			}
+		}
+
+		if workflowRecord.SpanContextJson != "" {
+			inputMessage.MessageAttributes["SpanContextJson"] = types.MessageAttributeValue{
+				DataType:    aws.String("String"),
+				StringValue: aws.String(workflowRecord.SpanContextJson),
 			}
 		}
 
