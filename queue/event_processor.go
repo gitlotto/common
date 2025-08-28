@@ -13,8 +13,6 @@ import (
 
 const otelAttributeKeyPrefix = "gitlotto.otel."
 
-var tracer = otel.Tracer("github.com/gitlotto/common/queue")
-
 type EventProcessor interface {
 	ProcessSingle(ctx context.Context, event *events.SQSMessage, logger *zap.Logger) (err error)
 }
@@ -26,13 +24,16 @@ func ProcessMultiple(
 	logger *zap.Logger,
 ) (commandsProcessed events.SQSEventResponse) {
 
+	tracer := otel.Tracer("github.com/gitlotto/common/queue")
+	ctx, span := tracer.Start(ctx, "queue.process_multiple", trace.WithSpanKind(trace.SpanKindInternal))
+	defer span.End()
+
 	logger.Info("Processing events in total", zap.Int("events", len(sqsEvents.Records)))
 
 	failures := []events.SQSBatchItemFailure{}
 
 	for _, event := range sqsEvents.Records {
 		ctx, span := tracer.Start(ctx, "queue.process_single", trace.WithSpanKind(trace.SpanKindInternal))
-		defer span.End()
 
 		var otelAttributes propagation.MapCarrier = make(propagation.MapCarrier)
 
@@ -53,6 +54,8 @@ func ProcessMultiple(
 			}
 			failures = append(failures, *eventFailure)
 		}
+
+		span.End()
 	}
 
 	if len(failures) > 0 {

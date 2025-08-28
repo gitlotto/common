@@ -25,6 +25,7 @@ type WorkflowRecord struct {
 	Event               string            `dynamodbav:"event"`
 	EventMessageGroupId string            `dynamodbav:"event_message_group_id"`
 	Baggage             map[string]string `dynamodbav:"baggage"`
+	SpanContextJson     string            `dynamodbav:"span_context_json"`
 }
 
 func (record WorkflowRecord) PartitionKey() types.AttributeValue {
@@ -56,6 +57,7 @@ func NewFifoWorkflowRecord(
 	event string,
 	eventGroupId string,
 	baggage map[string]string,
+	spanContextJson string,
 ) (*WorkflowRecord, error) {
 	if targetQueueUrl == "" || !strings.HasSuffix(targetQueueUrl, ".fifo") {
 		return nil, ErrFifoWorkflowQueueMismatch(targetQueueUrl)
@@ -74,6 +76,7 @@ func NewFifoWorkflowRecord(
 		Event:               event,
 		EventMessageGroupId: eventGroupId,
 		Baggage:             baggage,
+		SpanContextJson:     spanContextJson,
 	}
 	return &workflowRecord, nil
 }
