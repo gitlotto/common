@@ -29,7 +29,9 @@ func Test_new_fifo_workflowRecord_should_not_be_created_if_queue_is_simple(t *te
 		"key": "value",
 	}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.Error(t, err)
 	assert.Nil(t, workflow)
 	assert.Equal(t, ErrFifoWorkflowQueueMismatch(targetQueueUrl), err)
@@ -55,7 +57,9 @@ func Test_new_fifo_workflowRecord_should_be_stored_in_correct_form(t *testing.T)
 		"key2": "value2",
 	}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -96,6 +100,9 @@ func Test_new_fifo_workflowRecord_should_be_stored_in_correct_form(t *testing.T)
 				},
 			},
 		},
+		"span_context_json": &types.AttributeValueMemberS{
+			Value: spanContextJson,
+		},
 	}
 
 	assert.Equal(t, expectedItems, actualItems)
@@ -133,7 +140,9 @@ func Test_new_fifo_workflowRecord_with_empty_baggage_should_be_stored_in_correct
 
 	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -166,6 +175,9 @@ func Test_new_fifo_workflowRecord_with_empty_baggage_should_be_stored_in_correct
 		},
 		"baggage": &types.AttributeValueMemberM{
 			Value: map[string]types.AttributeValue{},
+		},
+		"span_context_json": &types.AttributeValueMemberS{
+			Value: spanContextJson,
 		},
 	}
 
@@ -206,7 +218,9 @@ func Test_Closed_WorkflowRecord_should_be_stored_in_correct(t *testing.T) {
 		"key2": "value2",
 	}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -254,6 +268,9 @@ func Test_Closed_WorkflowRecord_should_be_stored_in_correct(t *testing.T) {
 					Value: "value2",
 				},
 			},
+		},
+		"span_context_json": &types.AttributeValueMemberS{
+			Value: spanContextJson,
 		},
 	}
 

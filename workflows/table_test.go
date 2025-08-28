@@ -28,7 +28,9 @@ func Test_WorkflowRecordTable_should_postpone_the_workflow_if_it_is_still_open(t
 	eventGroupId := uuid.New().String()
 
 	baggage := map[string]string{}
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -72,7 +74,9 @@ func Test_WorkflowRecordTable_should_not_postpone_the_workflow_if_it_had_been_cl
 
 	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -115,7 +119,9 @@ func Test_WorkflowRecordTable_should_close_the_workflow_if_it_is_still_open(t *t
 
 	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -159,7 +165,9 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_if_it_had_been_close
 
 	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -202,7 +210,9 @@ func Test_WorkflowRecordTable_should_close_the_workflow_in_a_transaction_if_it_i
 
 	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -250,7 +260,9 @@ func Test_WorkflowRecordTable_should_not_close_the_workflow_in_a_transaction_if_
 
 	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -296,7 +308,9 @@ func Test_WorkflowRecordTable_should_create_a_workflow_in_a_transaction_if_it_ha
 
 	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
@@ -335,7 +349,9 @@ func Test_WorkflowRecordTable_should_not_create_a_workflow_if_it_has_not_been_cr
 
 	baggage := map[string]string{}
 
-	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 	assert.NotNil(t, workflow)
 
