@@ -317,7 +317,8 @@ func makeFifoWorkflowRecord(targetQueueUrl string, startAt time.Time) workflows.
 		"key1": "value1",
 		"key2": "value2",
 	}
-	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	if err != nil {
 		panic(err)
 	}

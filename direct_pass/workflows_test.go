@@ -25,6 +25,8 @@ func Test_open_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(t 
 
 	eventId := fmt.Sprintf("%s#%s", tableName, partitionKey)
 
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
 	baggage := map[string]string{
 		"key1": "value1",
 		"key2": "value2",
@@ -45,9 +47,10 @@ func Test_open_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(t 
 		"event":                  events.NewStringAttribute(event),
 		"event_message_group_id": events.NewStringAttribute(eventGroupId),
 		"baggage":                events.NewMapAttribute(baggageAsAttribute),
+		"span_context_json":      events.NewStringAttribute(spanContextJson),
 	}
 
-	expectedWorkflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	expectedWorkflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	assert.NoError(t, err)
 
 	actualWorkflow, err := unmarshalWorkflow(newImage)
@@ -75,6 +78,8 @@ func Test_closed_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(
 		"key2": events.NewStringAttribute("value2"),
 	}
 
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
 	newImage := map[string]events.DynamoDBAttributeValue{
 		"event_id":               events.NewStringAttribute(eventId),
 		"created_at":             events.NewStringAttribute(createdAt.String()),
@@ -85,6 +90,7 @@ func Test_closed_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(
 		"event":                  events.NewStringAttribute(event),
 		"event_message_group_id": events.NewStringAttribute(eventGroupId),
 		"baggage":                events.NewMapAttribute(baggageAsAttribute),
+		"span_context_json":      events.NewStringAttribute(spanContextJson),
 	}
 
 	baggage := map[string]string{
@@ -92,7 +98,7 @@ func Test_closed_workflowRecord_should_be_reconstituted_from_the_dynamodb_event(
 		"key2": "value2",
 	}
 
-	expectedWorkflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage)
+	expectedWorkflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	expectedWorkflow.FinishedAt = &finishedAt
 	expectedWorkflow.IsOpen = nil
 	assert.NoError(t, err)

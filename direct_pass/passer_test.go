@@ -111,6 +111,7 @@ func Test_Workflow_Direct_passer_should_write_the_workflow_into_the_sqs(t *testi
 						"event_message_group_id": events.NewStringAttribute(workflow.EventMessageGroupId),
 						"is_open":                events.NewStringAttribute("OPEN"),
 						"baggage":                events.NewMapAttribute(baggageAsAttribute),
+						"span_context_json":      events.NewStringAttribute(workflow.SpanContextJson),
 					},
 				},
 			},
@@ -179,6 +180,7 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 						"event_message_group_id": events.NewStringAttribute(workflow.EventMessageGroupId),
 						"is_open":                events.NewStringAttribute("OPEN"),
 						"baggage":                events.NewMapAttribute(baggageAsAttribute),
+						"span_context_json":      events.NewStringAttribute(workflow.SpanContextJson),
 					},
 				},
 			},
@@ -231,6 +233,7 @@ func Test_Workflow_Direct_passer_should_not_write_the_workflow_into_the_sqs_if_t
 						"event_message_group_id": events.NewStringAttribute(workflow.EventMessageGroupId),
 						"is_open":                events.NewStringAttribute("OPEN"),
 						"baggage":                events.NewMapAttribute(baggageAsAttribute),
+						"span_context_json":      events.NewStringAttribute(workflow.SpanContextJson),
 					},
 				},
 			},
@@ -286,6 +289,7 @@ func Test_Workflow_Outboxer_should_notify_if_it_fails_to_publish_an_event(t *tes
 						"event_message_group_id": events.NewStringAttribute(workflow.EventMessageGroupId),
 						"is_open":                events.NewStringAttribute("OPEN"),
 						"baggage":                events.NewMapAttribute(baggageAsAttribute),
+						"span_context_json":      events.NewStringAttribute(workflow.SpanContextJson),
 					},
 				},
 			},
@@ -333,7 +337,9 @@ func makeFifoWorkflowRecord(targetQueueUrl string, startAt time.Time) workflows.
 		"key2": "value2",
 	}
 
-	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId, baggage)
+	spanContextJson := `{"traceId":"01234567890123456789012345678901","spanId":"01234567890123456789012345678901","traceFlags":0,"traceState":{}}`
+
+	workflow, err := workflows.NewFifoWorkflowRecord(tableName, partitionKey, &sortKey, createdAt, zulu.DateTimeFromTime(startAt), targetQueueUrl, event, eventGroupId, baggage, spanContextJson)
 	if err != nil {
 		panic(err)
 	}

@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const otelAttributeKeyPrefix = "gitlotto.otel."
+const spanContextJsonAttributeKey = "SpanContextJson"
 
 type Outboxer struct {
 	workflowsTableName        string
@@ -100,10 +100,16 @@ func (outboxer *Outboxer) Outbox(ctx context.Context, requestId string) (err err
 		}
 
 		for key, value := range workflowRecord.Baggage {
-			specialKey := otelAttributeKeyPrefix + key
-			sendMessageInput.MessageAttributes[specialKey] = types.MessageAttributeValue{
+			sendMessageInput.MessageAttributes[key] = types.MessageAttributeValue{
 				DataType:    aws.String("String"),
 				StringValue: aws.String(value),
+			}
+		}
+
+		if workflowRecord.SpanContextJson != "" {
+			sendMessageInput.MessageAttributes["SpanContextJson"] = types.MessageAttributeValue{
+				DataType:    aws.String("String"),
+				StringValue: aws.String(workflowRecord.SpanContextJson),
 			}
 		}
 
