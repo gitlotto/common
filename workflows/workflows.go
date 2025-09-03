@@ -1,17 +1,28 @@
 package workflows
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/gitlotto/common/zulu"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var tracer = otel.Tracer("github.com/gitlotto/common/workflows")
 
 func ErrFifoWorkflowQueueMismatch(queueUrl string) error {
 	return fmt.Errorf("fifo workflow should not delegate to a simple SQS queue %s", queueUrl)
+}
+
+func ErrSpanContextMarshalFailed(err error) error {
+	return fmt.Errorf("failed to marshal span context: %w", err)
 }
 
 type WorkflowRecord struct {
@@ -79,6 +90,52 @@ func NewFifoWorkflowRecord(
 		SpanContextJson:     spanContextJson,
 	}
 	return &workflowRecord, nil
+}
+
+func NewFifoWorkflowRecordFromContext(
+	ctx context.Context,
+	tableName string,
+	partitionKey string,
+	sortKey *string,
+	createdAt zulu.DateTime,
+	startAt zulu.DateTime,
+	targetQueueUrl string,
+	event string,
+	eventGroupId string,
+) (context.Context, *WorkflowRecord, error) {
+	ctx, span := tracer.Start(ctx, "workflows.publish_command", trace.WithSpanKind(trace.SpanKindProducer))
+	defer span.End()
+
+	baggage := make(propagation.MapCarrier)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.MapCarrier(baggage))
+
+	spanContext := trace.SpanContextFromContext(ctx)
+	spanContextJson, err := json.Marshal(spanContext)
+	if err != nil {
+		return ctx, nil, ErrSpanContextMarshalFailed(err)
+	}
+	spanContextJsonString := string(spanContextJson)
+	if targetQueueUrl == "" || !strings.HasSuffix(targetQueueUrl, ".fifo") {
+		err = ErrFifoWorkflowQueueMismatch(targetQueueUrl)
+		return ctx, nil, err
+	}
+	isOpen := Open
+	eventId := NewEventId(tableName, partitionKey, sortKey)
+	amountOfStarts := 0
+	workflowRecord := &WorkflowRecord{
+		EventId:             eventId.String(),
+		CreatedAt:           createdAt,
+		StartAt:             startAt,
+		AmountOfStarts:      amountOfStarts,
+		IsOpen:              &isOpen,
+		FinishedAt:          nil,
+		TargetQueueUrl:      targetQueueUrl,
+		Event:               event,
+		EventMessageGroupId: eventGroupId,
+		Baggage:             baggage,
+		SpanContextJson:     spanContextJsonString,
+	}
+	return ctx, workflowRecord, nil
 }
 
 type IsOpen string
