@@ -123,6 +123,80 @@ func Test_new_fifo_workflowRecord_should_be_stored_in_correct_form(t *testing.T)
 	assert.Equal(t, expectedWorkflow, actualWorkflow)
 }
 
+func Test_new_fifo_workflowRecord_built_from_empty_context_should_be_stored_in_correct_form(t *testing.T) {
+	var err error
+	ctx := context.TODO()
+
+	tableName := uuid.New().String()
+	partitionKey := uuid.New().String()
+	createdAt := zulu.DateTimeFromTime(time.Date(2023, time.October, 15, 12, 45, 14, 0, time.UTC))
+	startAt := zulu.DateTimeFromTime(time.Date(2023, time.October, 16, 12, 45, 14, 0, time.UTC))
+	targetQueueUrl := uuid.New().String() + ".fifo"
+
+	event := fmt.Sprintf(`{"partitionKey":"%s","sortKey":null}`, partitionKey)
+	eventGroupId := uuid.New().String()
+
+	eventId := fmt.Sprintf("%s#%s", tableName, partitionKey)
+
+	_, workflow, err := NewFifoWorkflowRecordFromContext(ctx, tableName, partitionKey, nil, createdAt, startAt, targetQueueUrl, event, eventGroupId)
+	assert.NoError(t, err)
+	assert.NotNil(t, workflow)
+
+	expectedSpanContextJson := `{"TraceID":"00000000000000000000000000000000","SpanID":"0000000000000000","TraceFlags":"00","TraceState":"","Remote":false}`
+
+	actualItems, err := attributevalue.MarshalMap(*workflow)
+	assert.NoError(t, err)
+	expectedItems := map[string]types.AttributeValue{
+		"event_id": &types.AttributeValueMemberS{
+			Value: eventId,
+		},
+		"created_at": &types.AttributeValueMemberS{
+			Value: "2023-10-15T12:45:14Z",
+		},
+		"start_at": &types.AttributeValueMemberS{
+			Value: "2023-10-16T12:45:14Z",
+		},
+		"amount_of_starts": &types.AttributeValueMemberN{
+			Value: "0",
+		},
+		"target_queue_url": &types.AttributeValueMemberS{
+			Value: targetQueueUrl,
+		},
+		"is_open": &types.AttributeValueMemberS{
+			Value: string(Open),
+		},
+		"event": &types.AttributeValueMemberS{
+			Value: event,
+		},
+		"event_message_group_id": &types.AttributeValueMemberS{
+			Value: eventGroupId,
+		},
+		"baggage": &types.AttributeValueMemberM{
+			Value: map[string]types.AttributeValue{},
+		},
+		"span_context_json": &types.AttributeValueMemberS{
+			Value: expectedSpanContextJson,
+		},
+	}
+
+	assert.Equal(t, expectedItems, actualItems)
+
+	err = workflowRecordTable.Action(dynamodbClient).Persist(ctx, *workflow)
+	assert.NoError(t, err)
+
+	actualWorkflow := WorkflowRecord{
+		EventId:        eventId,
+		TargetQueueUrl: targetQueueUrl,
+	}
+	err = workflowRecordTable.Action(dynamodbClient).Reconstitute(ctx, &actualWorkflow)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, actualWorkflow)
+
+	expectedWorkflow := *workflow
+	assert.Equal(t, expectedWorkflow, actualWorkflow)
+}
+
 func Test_new_fifo_workflowRecord_with_empty_baggage_should_be_stored_in_correct_form(t *testing.T) {
 	var err error
 	ctx := context.TODO()
@@ -199,7 +273,7 @@ func Test_new_fifo_workflowRecord_with_empty_baggage_should_be_stored_in_correct
 	assert.Equal(t, expectedWorkflow, actualWorkflow)
 }
 
-func Test_Closed_WorkflowRecord_should_be_stored_in_correct(t *testing.T) {
+func Test_Closed_WorkflowRecord_should_be_stored_in_correct_from(t *testing.T) {
 
 	ctx := context.TODO()
 
