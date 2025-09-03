@@ -50,6 +50,7 @@ github.com/gitlotto/common/notification v0.22.0 h1:bQQpYIln4ogREl3iLPFMJToWNhOGE
 github.com/gitlotto/common/notification v0.22.0/go.mod h1:m5Wt8f7LGgXJmZ0wJaZWq8ikfDKS14K/3MMxpcWzPy0=
 github.com/gitlotto/common/queue v0.25.0 h1:wm9WRunFSyArLvYH5xsErJL8mOgEr+bdKxYZKdwBS9c=
 github.com/gitlotto/common/queue v0.25.0/go.mod h1:Qj6+n72Z9RWbJlGquRbZoCjEPrcryUFawvv6WPECDQ4=
+github.com/gitlotto/common/queue v0.26.0/go.mod h1:Qj6+n72Z9RWbJlGquRbZoCjEPrcryUFawvv6WPECDQ4=
 github.com/gitlotto/common/workflows v0.24.0 h1:lNjgrYGEdyUWPvhreoGjQoHRIlS6qWzDjkuQLkFsiKU=
 github.com/gitlotto/common/workflows v0.24.0/go.mod h1:TtdVVmqtukNiL1zreSPj55gb0JYwG01OW9E3+cktLRM=
 github.com/gitlotto/common/zulu v0.22.0 h1:5HoF3KLUGBtAKJadlKW+dECyx3Hl3HD26aa4DrXIkB4=

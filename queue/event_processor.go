@@ -50,7 +50,7 @@ func ProcessMultiple(
 
 		propagator := otel.GetTextMapPropagator()
 		extractedCtx := propagator.Extract(ctx, otelAttributes)
-		singleEventCtx, span := tracer.Start(extractedCtx, "queue.process_single", trace.WithSpanKind(trace.SpanKindInternal))
+		singleEventCtx, span := tracer.Start(extractedCtx, "queue.process_single", trace.WithSpanKind(trace.SpanKindConsumer))
 
 		errOfTheMessage := eventProcessor.ProcessSingle(singleEventCtx, &event, logger)
 		if errOfTheMessage != nil {
