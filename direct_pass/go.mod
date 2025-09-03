@@ -45,7 +45,7 @@ require (
 	github.com/gitlotto/common/env_var v0.22.0
 	github.com/gitlotto/common/logging v0.22.0
 	github.com/gitlotto/common/notification v0.22.0
-	github.com/gitlotto/common/queue v0.26.0
+	github.com/gitlotto/common/queue v0.27.0
 	github.com/gitlotto/common/workflows v0.24.0
 	github.com/gitlotto/common/zulu v0.22.0
 	go.uber.org/zap v1.27.0
