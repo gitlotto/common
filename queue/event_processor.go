@@ -2,7 +2,6 @@ package queue
 
 import (
 	"context"
-	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"go.opentelemetry.io/otel"
@@ -10,8 +9,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
-
-const otelAttributeKeyPrefix = "gitlotto.otel."
 
 type EventProcessor interface {
 	ProcessSingle(ctx context.Context, event *events.SQSMessage, logger *zap.Logger) (err error)
@@ -33,21 +30,29 @@ func ProcessMultiple(
 	failures := []events.SQSBatchItemFailure{}
 
 	for _, event := range sqsEvents.Records {
-		ctx, span := tracer.Start(ctx, "queue.process_single", trace.WithSpanKind(trace.SpanKindInternal))
-
 		var otelAttributes propagation.MapCarrier = make(propagation.MapCarrier)
 
 		for key, value := range event.MessageAttributes {
-			if strings.HasPrefix(key, otelAttributeKeyPrefix) && value.DataType == "String" && value.StringValue != nil {
-				purifiedKey := strings.TrimPrefix(key, otelAttributeKeyPrefix)
-				otelAttributes[purifiedKey] = *value.StringValue
+			if value.DataType != "String" || value.StringValue == nil {
+				continue
+			}
+
+			stringValue := *value.StringValue
+
+			switch key {
+			case "X-Amzn-Trace-Id":
+				logger.Info("Found X-Amzn-Trace-Id header", zap.String("traceId", stringValue))
+				otelAttributes["X-Amzn-Trace-Id"] = stringValue
+			case "SpanContextJson":
+				logger.Info("Found SpanContextJson header", zap.String("spanContextJson", stringValue))
 			}
 		}
 
 		propagator := otel.GetTextMapPropagator()
-		propagator.Extract(ctx, propagation.MapCarrier(otelAttributes))
+		extractedCtx := propagator.Extract(ctx, otelAttributes)
+		singleEventCtx, span := tracer.Start(extractedCtx, "queue.process_single", trace.WithSpanKind(trace.SpanKindInternal))
 
-		errOfTheMessage := eventProcessor.ProcessSingle(ctx, &event, logger)
+		errOfTheMessage := eventProcessor.ProcessSingle(singleEventCtx, &event, logger)
 		if errOfTheMessage != nil {
 			eventFailure := &events.SQSBatchItemFailure{
 				ItemIdentifier: event.MessageId,
