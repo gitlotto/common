@@ -70,7 +70,57 @@ func (table TableAction[R]) Persist(ctx context.Context, record R) (err error) {
 	return
 }
 
-func (table TableAction[R]) Query(ctx context.Context, record R, cursor *string, limit int) (records []R, nextCursor *string, err error) {
+func (table TableAction[R]) Query(
+	ctx context.Context,
+	parititonKeyValue types.AttributeValue,
+	excludedStartSortKey *types.AttributeValue,
+	ascending bool,
+	limit int,
+) (records []R, err error) {
+
+	partitionKeyName := table.PartitionKey
+
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(table.Name),
+		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :the_partition_key", partitionKeyName)),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":the_partition_key": parititonKeyValue,
+		},
+		ScanIndexForward: aws.Bool(ascending),
+	}
+
+	if excludedStartSortKey != nil {
+		if table.SortKey == nil {
+			err = ErrSortKeyIsMissing(table.Name, *table.SortKey)
+			return
+		}
+		sortKeyName := *table.SortKey
+		sortKeyValue := *excludedStartSortKey
+
+		queryInput.ExclusiveStartKey = map[string]types.AttributeValue{
+			partitionKeyName: parititonKeyValue,
+			sortKeyName:      sortKeyValue,
+		}
+	}
+
+	queryInput.Limit = aws.Int32(int32(limit))
+
+	items, err := table.DynamodbClient.Query(ctx, queryInput)
+	if err != nil {
+		return
+	}
+
+	records = make([]R, len(items.Items))
+	err = attributevalue.UnmarshalListOfMaps(items.Items, &records)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+// Deprecated: use Query
+func (table TableAction[R]) QueryDesc(ctx context.Context, record R, cursor *string, limit int) (records []R, nextCursor *string, err error) {
 
 	partitionKeyName := table.PartitionKey
 	parititonKeyValue := record.PartitionKey()
@@ -113,6 +163,7 @@ func (table TableAction[R]) Query(ctx context.Context, record R, cursor *string,
 	return
 }
 
+// Deprecated: use Query
 func (table TableAction[R]) QueryAsc(ctx context.Context, record R, cursor *string, limit int) (records []R, nextCursor *string, err error) {
 
 	queryInput := &dynamodb.QueryInput{
