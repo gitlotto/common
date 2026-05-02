@@ -246,7 +246,7 @@ func Test_Reconstitute_should_return_error_if_the_composite_record_does_not_exis
 
 }
 
-func Test_Querying_should_fetch_composite_records_from_the_beginning_if_no_cursor_is_provided(t *testing.T) {
+func Test_QueryingDesc_should_fetch_composite_records_from_the_beginning_if_no_cursor_is_provided(t *testing.T) {
 	var err error
 	ctx := context.TODO()
 
@@ -298,7 +298,7 @@ func Test_Querying_should_fetch_composite_records_from_the_beginning_if_no_curso
 	assert.NoError(t, err)
 
 	limit := 2
-	actualRecords, nextCursor, err := compositeRecordsTable.Action(dynamodbClient).Query(ctx, firstRecord, nil, limit)
+	actualRecords, nextCursor, err := compositeRecordsTable.Action(dynamodbClient).QueryDesc(ctx, firstRecord, nil, limit)
 	assert.NoError(t, err)
 	assert.Contains(t, actualRecords, fifthRecord)
 	assert.Contains(t, actualRecords, fourthRecord)
@@ -309,7 +309,7 @@ func Test_Querying_should_fetch_composite_records_from_the_beginning_if_no_curso
 
 }
 
-func Test_Querying_should_fetch_composite_records_from_the_given_cursor(t *testing.T) {
+func Test_QueryingDesc_should_fetch_composite_records_from_the_given_cursor(t *testing.T) {
 	var err error
 	ctx := context.TODO()
 
@@ -363,7 +363,7 @@ func Test_Querying_should_fetch_composite_records_from_the_given_cursor(t *testi
 	limit := 2
 	startingCursor := "eyJwYXJ0aXRpb25fa2V5Ijp7IlMiOiJiYzhmNmQ5Yi1jYzQ3LTQ2ZTctYTE4Yi00ODliNjNkOGRmYzQifSwic29ydF9rZXkiOnsiTiI6IjQifX0="
 
-	actualRecords, nextCursor, err := compositeRecordsTable.Action(dynamodbClient).Query(ctx, firstRecord, &startingCursor, limit)
+	actualRecords, nextCursor, err := compositeRecordsTable.Action(dynamodbClient).QueryDesc(ctx, firstRecord, &startingCursor, limit)
 	assert.NoError(t, err)
 	assert.Contains(t, actualRecords, thirdRecord)
 	assert.Contains(t, actualRecords, secondRecord)
@@ -374,7 +374,7 @@ func Test_Querying_should_fetch_composite_records_from_the_given_cursor(t *testi
 
 }
 
-func Test_Querying_should_fetch_the_last_composite_records_and_return_nil_as_a_cursor(t *testing.T) {
+func Test_QueryingDesc_should_fetch_the_last_composite_records_and_return_nil_as_a_cursor(t *testing.T) {
 	var err error
 	ctx := context.TODO()
 
@@ -428,7 +428,7 @@ func Test_Querying_should_fetch_the_last_composite_records_and_return_nil_as_a_c
 	limit := 10
 	startingCursor := "eyJwYXJ0aXRpb25fa2V5Ijp7IlMiOiI4MGY4ZjM4Zi04ZjYzLTQzNDAtODUwZC1mY2JkNmI5NWQ4MjYifSwic29ydF9rZXkiOnsiTiI6IjQifX0="
 
-	actualRecords, nextCursor, err := compositeRecordsTable.Action(dynamodbClient).Query(ctx, firstRecord, &startingCursor, limit)
+	actualRecords, nextCursor, err := compositeRecordsTable.Action(dynamodbClient).QueryDesc(ctx, firstRecord, &startingCursor, limit)
 	assert.NoError(t, err)
 	assert.Contains(t, actualRecords, thirdRecord)
 	assert.Contains(t, actualRecords, secondRecord)
